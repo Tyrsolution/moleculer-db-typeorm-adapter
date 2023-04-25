@@ -16,7 +16,8 @@
 		"deps": "npm-check -u",
 		"coverall": "cat ./coverage/lcov.info | ./node_modules/coveralls/bin/coveralls.js",
 		"build": "yarn build:clean && tsc --build tsconfig.json",
-		"build:clean": "rimraf dist bin"
+		"build:clean": "rimraf dist bin",
+		"release": "np"
 	},
 	"keywords": [
 		"moleculer",
@@ -74,6 +75,7 @@
 	"dependencies": {
 		"bluebird": "^3.7.2",
 		"lodash": "^4.17.21",
+		"np": "^7.7.0",
 		"typeorm": "^0.3.15"
 	}
 }
