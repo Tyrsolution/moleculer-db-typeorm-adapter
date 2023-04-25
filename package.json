@@ -1,5 +1,5 @@
 {
-	"name": "moleculer-db-adapter-typeorm",
+	"name": "moleculer-db-typeorm-adapter",
 	"version": "1.0.0",
 	"description": "",
 	"main": "./dist/index.js",
@@ -24,7 +24,7 @@
 	],
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/tyrsolution/moleculer-db-adapter-typeorm.git"
+		"url": "https://github.com/tyrsolution/moleculer-db-typeorm-adapter.git"
 	},
 	"author": "Tyr Solutions",
 	"license": "MIT",

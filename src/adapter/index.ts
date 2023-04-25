@@ -134,16 +134,18 @@ export class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 		 * set connection manager on this.adapter
 		 */
 		this.connectionManager = new ConnectionManager();
-		this.db = await this.connectionManager.create(this.opts);
+		// this.db = await this.connectionManager.create(this.opts);
+		const db = await this.connectionManager.create(this.opts);
 
-		return await this.db
+		// return await this.db
+		return await db
 			.initialize()
 			.then((datasource: any) => {
 				this.broker.logger.info(
 					`${this.service.name} has connected to ${datasource.name} database`,
 				);
 
-				const entity: { [key: string]: any } = isArray(this._entity)
+				const baseEntity: { [key: string]: any } = isArray(this._entity)
 					? (this._entity[0] as unknown as DataSource)
 					: (this._entity as unknown as DataSource);
 
@@ -160,14 +162,89 @@ export class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 					});
 					return methods;
 				};
-				const methodNames = entityMethods(entity);
+
+				const additionalEntities: Array<EntitySchema<Entity>> = isArray(this._entity)
+					? this._entity.slice(1)
+					: [];
+
+				/**
+				 * add additional entities and methods to adapter
+				 * under entity name this.adapter.entityName
+				 */
+				additionalEntities.forEach((entity: any) => {
+					const dbRepository = db.getRepository(entity);
+					const entityName = dbRepository.metadata.name;
+					const methodNames = entityMethods(entity);
+					/**
+					 * object for entity methods to this.adapter.entityName
+					 * getRepository function required for this to work
+					 */
+					const methodsToAdd: { [key: string]: any } = {
+						manager: dbRepository.manager,
+						repository: dbRepository,
+						getRepository: function getRepository() {
+							const dataSource = db;
+							if (!dataSource)
+								throw new Error(`DataSource is not set for this entity.`);
+							return dataSource.getRepository(entity);
+						},
+					};
+					methodNames.forEach((method) => {
+						methodsToAdd[method] = entity[method];
+					});
+					[
+						'hasId',
+						'save',
+						'remove',
+						'softRemove',
+						'recover',
+						'reload',
+						'useDataSource',
+						'target',
+						'getId',
+						'createQueryBuilder',
+						'create',
+						'merge',
+						'preload',
+						'insert',
+						'update',
+						'delete',
+						'count',
+						'countBy',
+						'sum',
+						'average',
+						'minimum',
+						'maximum',
+						'find',
+						'findBy',
+						'findAndCount',
+						'findAndCountBy',
+						'findOne',
+						'findOneBy',
+						'findOneOrFail',
+						'findOneByOrFail',
+						'query',
+						'clear',
+					].forEach((method) => {
+						methodsToAdd[method] = entity[method];
+					});
+					/**
+					 * apply entity methods to this.adapter.entityName
+					 */
+					this[entityName] = methodsToAdd;
+				});
+
+				/**
+				 * Base Entity
+				 */
+				const methodNames = entityMethods(baseEntity);
 
 				/**
 				 * set entity methods on this.adapter
 				 * for active record pattern
 				 */
 				methodNames.forEach((method) => {
-					this[method] = entity[method];
+					this[method] = baseEntity[method];
 				});
 
 				/**
@@ -208,19 +285,23 @@ export class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 					'query',
 					'clear',
 				].forEach((method) => {
-					this[method] = entity[method];
+					this[method] = baseEntity[method];
 				});
 
 				/**
 				 * set entity manager on this.adapter
 				 */
-				this.manager = this.db.manager;
+				this.manager = db.manager;
+				// this.manager = this.db.manager;
 				/**
 				 * set repository on this.adapter
 				 */
-				this.repository = this.db.getRepository(
+				this.repository = db.getRepository(
 					isArray(this._entity) ? this._entity[0] : this._entity,
 				);
+				// this.repository = this.db.getRepository(
+				// 	isArray(this._entity) ? this._entity[0] : this._entity,
+				// );
 
 				this.dataSource = datasource;
 				// return datasource;
