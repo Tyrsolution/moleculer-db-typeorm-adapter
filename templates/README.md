@@ -1,8 +1,8 @@
 ![Moleculer logo](http://moleculer.services/images/banner.png)
 
-<!-- [![Build Status](https://travis-ci.org/tyrsoluiton/moleculer-db-typeorm-adapter.svg?branch=master)](https://travis-ci.org/tyrsoluiton/@tyrsolutions/moleculer-db-typeorm-adapter) -->
-[![Coverage Status](https://coveralls.io/repos/github/tyrsoluiton/moleculer-db-typeorm-adapter/badge.svg?branch=master)](https://coveralls.io/github/tyrsoluiton/moleculer-db-typeorm-adapter?branch=master)
-[![Known Vulnerabilities](https://snyk.io/test/github/tyrsoluiton/moleculer-db-typeorm-adapter/badge.svg)](https://snyk.io/test/github/tyrsoluiton/moleculer-db-typeorm-adapter)
+<!-- [![Build Status](https://travis-ci.org/tyrsolution/moleculer-db-typeorm-adapter.svg?branch=master)](https://travis-ci.org/tyrsolution/moleculer-db-typeorm-adapter) -->
+[![Coverage Status](https://coveralls.io/repos/github/tyrsolution/moleculer-db-typeorm-adapter/badge.svg?branch=master)](https://coveralls.io/github/tyrsolution/moleculer-db-typeorm-adapter?branch=master)
+[![Known Vulnerabilities](https://snyk.io/test/github/tyrsolution/moleculer-db-typeorm-adapter/badge.svg)](https://snyk.io/test/github/tyrsolution/moleculer-db-typeorm-adapter)
 
 # @tyrsolutions/moleculer-db-typeorm-adapter [![NPM version](https://img.shields.io/npm/v/@tyrsolutions/moleculer-db-typeorm-adapter.svg)](https://www.npmjs.com/package/@tyrsolutions/moleculer-db-typeorm-adapter)
 A TypeORM adapter for moleculer
