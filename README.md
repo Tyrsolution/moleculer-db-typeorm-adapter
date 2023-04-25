@@ -5,16 +5,19 @@
 [![Known Vulnerabilities](https://snyk.io/test/github/tyrsoluiton/moleculer-db-typeorm-adapter/badge.svg)](https://snyk.io/test/github/tyrsoluiton/moleculer-db-typeorm-adapter)
 
 # moleculer-db-typeorm-adapter [![NPM version](https://img.shields.io/npm/v/moleculer-db-typeorm-adapter.svg)](https://www.npmjs.com/package/moleculer-db-typeorm-adapter)
-
+A TypeORM adapter for moleculer
 
 
 ## Features
 
 - All supported TypeORM databases
-- Active Record methodology for base entity (the connection returned by adapter is the primary entity to which custom queries can be added to the entity and are automatically surfaced with this.adapter)
+- Active Record methodology for entities or data mapping methodology if entity class doesn't extend TypeORM BaseEntity built in
 - Connection Manager - manage your existing connections or create new ones to different database systems on the same service.
-- Access to entity manager and repository if more advanced TypeORM features are required
-- Base database connection starts and stops when service does
+- All entities added to TypeORMDbAdapter and model array are added to this.adapter
+  - Base entity ```this.adapter```
+  - any aditional entity ```this.adapter.<entity name>```
+- Repository and entityManager surfaced for ```this.adapter``` and additional entities ```this.adapter.<entity name>``` if more advanced TypeORM features are required
+- Database connection starts and stops when service does
 
 ## Install
 #### NPM
@@ -41,7 +44,7 @@ service: {
         entities: [TypeProduct],
     }),
 
-    model: [TypeProduct],
+    model: TypeProduct || [TypeProduct, TypeProduct2], // accepts single entity or array of entities. Must be added to entities in TypeORMDbAdapter object
     ...
 }
 ```

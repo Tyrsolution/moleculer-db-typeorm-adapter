@@ -1,0 +1,51 @@
+{
+  "name": "docgen",
+  "version": "0.3.0",
+  "description": "Documentation generator for Moleculer services",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nodemon index.js -- -t examples/README.test.md -s services/test.service.js -d out/README.test.md",
+    "demo": "node index.js -t templates/README.db.md -s services/db.service.js -d out/README.db.md",
+    "lint": "eslint --ext=.js .",
+    "lint:fix": "eslint --ext=.js --fix .",
+    "preversion": "npm run lint",
+    "postversion": "git push && git push --follow-tags"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tyrsolution/docgen.git"
+  },
+  "keywords": [
+    "microservices",
+    "microservice",
+    "moleculer"
+  ],
+  "author": "MoleculerJS",
+  "license": "MIT",
+  "devDependencies": {
+    "eslint": "8.39.0",
+    "eslint-plugin-node": "11.1.0",
+    "eslint-plugin-promise": "6.1.1",
+    "eslint-plugin-security": "1.7.1",
+    "nodemon": "^2.0.22",
+    "pre-commit": "1.2.2"
+  },
+  "pre-commit": [
+    "lint"
+  ],
+  "bugs": {
+    "url": "https://github.com/tyrsolution/docgen/issues"
+  },
+  "homepage": "https://github.com/tyrsolution/docgen#readme",
+  "engines": {
+    "node": ">= 10.x.x"
+  },
+  "dependencies": {
+    "args": "^5.0.3",
+    "bluebird": "3.7.2",
+    "chalk": "4.1.2",
+    "handlebars": "^4.7.7",
+    "jsdoc-api": "8.0.0",
+    "lodash": "^4.17.21"
+  }
+}

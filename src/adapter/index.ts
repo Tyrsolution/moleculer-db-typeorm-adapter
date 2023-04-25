@@ -134,18 +134,20 @@ export class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 		 * set connection manager on this.adapter
 		 */
 		this.connectionManager = new ConnectionManager();
-		this.db = await this.connectionManager.create(this.opts);
+		// this.db = await this.connectionManager.create(this.opts);
+		const db = await this.connectionManager.create(this.opts);
 
-		return await this.db
+		// return await this.db
+		return await db
 			.initialize()
 			.then((datasource: any) => {
 				this.broker.logger.info(
 					`${this.service.name} has connected to ${datasource.name} database`,
 				);
 
-				const entity: { [key: string]: any } = isArray(this._entity)
-					? (this._entity[0] as unknown as DataSource)
-					: (this._entity as unknown as DataSource);
+				const entityArrray: { [key: string]: any } = isArray(this._entity)
+					? (this._entity as unknown as DataSource)
+					: [this._entity as unknown as DataSource];
 
 				/**
 				 * get entity methods
@@ -160,70 +162,106 @@ export class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 					});
 					return methods;
 				};
-				const methodNames = entityMethods(entity);
 
 				/**
-				 * set entity methods on this.adapter
-				 * for active record pattern
+				 * add additional entities and methods to adapter
+				 * under entity name this.adapter.entityName
 				 */
-				methodNames.forEach((method) => {
-					this[method] = entity[method];
-				});
+				entityArrray.forEach((entity: any, index: number) => {
+					const dbRepository = db.getRepository(entity);
+					const entityName = dbRepository.metadata.name;
+					const methodNames = entityMethods(entity);
+					/**
+					 * object for entity methods to this.adapter.entityName
+					 * getRepository function required for this to work
+					 */
+					const methodsToAdd: { [key: string]: any } = {
+						manager: dbRepository.manager,
+						repository: dbRepository,
+						getRepository: function getRepository() {
+							const dataSource = db;
+							if (!dataSource)
+								throw new Error(`DataSource is not set for this entity.`);
+							return dataSource.getRepository(entity);
+						},
+					};
+					/**
+					 * add base entity methods to this.adapter
+					 * or add additional methods to methods object
+					 */
+					methodNames.forEach((method) => {
+						index === 0
+							? (this[method] = entity[method])
+							: (methodsToAdd[method] = entity[method]);
+					});
+					/**
+					 * add entity local methods to this.adapter or methods object
+					 */
 
-				/**
-				 * set base entity methods on this.adapter
-				 * for active record pattern
-				 */
-				[
-					'hasId',
-					'save',
-					'remove',
-					'softRemove',
-					'recover',
-					'reload',
-					'useDataSource',
-					'target',
-					'getId',
-					'createQueryBuilder',
-					'create',
-					'merge',
-					'preload',
-					'insert',
-					'update',
-					'delete',
-					'count',
-					'countBy',
-					'sum',
-					'average',
-					'minimum',
-					'maximum',
-					'find',
-					'findBy',
-					'findAndCount',
-					'findAndCountBy',
-					'findOne',
-					'findOneBy',
-					'findOneOrFail',
-					'findOneByOrFail',
-					'query',
-					'clear',
-				].forEach((method) => {
-					this[method] = entity[method];
+					[
+						'hasId',
+						'save',
+						'remove',
+						'softRemove',
+						'recover',
+						'reload',
+						'useDataSource',
+						'target',
+						'getId',
+						'createQueryBuilder',
+						'create',
+						'merge',
+						'preload',
+						'insert',
+						'update',
+						'delete',
+						'count',
+						'countBy',
+						'sum',
+						'average',
+						'minimum',
+						'maximum',
+						'find',
+						'findBy',
+						'findAndCount',
+						'findAndCountBy',
+						'findOne',
+						'findOneBy',
+						'findOneOrFail',
+						'findOneByOrFail',
+						'query',
+						'clear',
+					].forEach((method) => {
+						index === 0
+							? (this[method] = entity[method])
+							: (methodsToAdd[method] = entity[method]);
+					});
+					/**
+					 * apply entity methods object to this.adapter.entityName
+					 */
+					!entity['save']
+						? this.broker.logger.warn(
+								`Entity class ${entityName} does not extend TypeORM BaseEntity, use data mapping with this.adapter.repository instead of active record methodology.`,
+						  )
+						: index !== 0
+						? (this[entityName] = methodsToAdd)
+						: null;
 				});
 
 				/**
 				 * set entity manager on this.adapter
 				 */
-				this.manager = this.db.manager;
+				this.manager = db.manager;
+
 				/**
 				 * set repository on this.adapter
 				 */
-				this.repository = this.db.getRepository(
-					isArray(this._entity) ? this._entity[0] : this._entity,
-				);
+				this.repository = db.getRepository(entityArrray[0]);
 
+				/**
+				 * set datasource on this.adapter
+				 */
 				this.dataSource = datasource;
-				// return datasource;
 			})
 			.catch((err: any) => {
 				this.broker.logger.error(`Error initializing database: ${err.message}`);

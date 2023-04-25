@@ -1,4 +1,4 @@
-declare module 'moleculer-db-adapter-typeorm' {
+declare module 'moleculer-db-typeorm-adapter' {
 	import type { Context, ServiceBroker, Service } from 'moleculer';
 	import {
 		DeleteResult,

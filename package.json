@@ -1,15 +1,16 @@
 {
-	"name": "moleculer-db-adapter-typeorm",
+	"name": "moleculer-db-typeorm-adapter",
 	"version": "1.0.0",
 	"description": "",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"scripts": {
+		"installDeps": "yarn install && cd ./docgen && yarn install",
 		"dev": "nodemon examples/index.js",
 		"ci": "jest --watch",
 		"clean": "yarn clean:packages && yarn install",
 		"clean:packages": "rm -fr yarn.lock package-lock.json dist node_modules",
-		"generateDocumentation": "node ./node_modules/docgen/index.js -t ./templates/README.md -s ./dist/adapter/index.js,./dist/adapter/connectionManager/index.js -d README.md",
+		"generateDocumentation": "node ./docgen/index.js -t ./templates/README.md -s ./dist/adapter/index.js,./dist/adapter/connectionManager/index.js -d README.md",
 		"test": "jest --coverage",
 		"lint": "eslint --ext=.js src test",
 		"deps": "npm-check -u",
@@ -24,7 +25,7 @@
 	],
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/tyrsolution/moleculer-db-adapter-typeorm.git"
+		"url": "https://github.com/tyrsolution/moleculer-db-typeorm-adapter.git"
 	},
 	"author": "Tyr Solutions",
 	"license": "MIT",
@@ -72,7 +73,6 @@
 	},
 	"dependencies": {
 		"bluebird": "^3.7.2",
-		"docgen": "file:../../docgen",
 		"lodash": "^4.17.21",
 		"typeorm": "^0.3.15"
 	}
