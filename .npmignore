@@ -12,3 +12,9 @@ test/
 .editorconfig
 .eslintrc.js
 prettier.config.js
+moleculer-db-typeorm-adapter.d.ts
+src/
+templates/
+examples/
+docgen/
+.gitignore
