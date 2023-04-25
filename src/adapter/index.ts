@@ -145,9 +145,9 @@ export class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 					`${this.service.name} has connected to ${datasource.name} database`,
 				);
 
-				const baseEntity: { [key: string]: any } = isArray(this._entity)
-					? (this._entity[0] as unknown as DataSource)
-					: (this._entity as unknown as DataSource);
+				const entityArrray: { [key: string]: any } = isArray(this._entity)
+					? (this._entity as unknown as DataSource)
+					: [this._entity as unknown as DataSource];
 
 				/**
 				 * get entity methods
@@ -163,15 +163,11 @@ export class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 					return methods;
 				};
 
-				const additionalEntities: Array<EntitySchema<Entity>> = isArray(this._entity)
-					? this._entity.slice(1)
-					: [];
-
 				/**
 				 * add additional entities and methods to adapter
 				 * under entity name this.adapter.entityName
 				 */
-				additionalEntities.forEach((entity: any) => {
+				entityArrray.forEach((entity: any, index: number) => {
 					const dbRepository = db.getRepository(entity);
 					const entityName = dbRepository.metadata.name;
 					const methodNames = entityMethods(entity);
@@ -189,9 +185,18 @@ export class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 							return dataSource.getRepository(entity);
 						},
 					};
+					/**
+					 * add base entity methods to this.adapter
+					 * or add additional methods to methods object
+					 */
 					methodNames.forEach((method) => {
-						methodsToAdd[method] = entity[method];
+						index === 0
+							? (this[method] = entity[method])
+							: (methodsToAdd[method] = entity[method]);
 					});
+					/**
+					 * add entity local methods to this.adapter or methods object
+					 */
 					[
 						'hasId',
 						'save',
@@ -226,85 +231,30 @@ export class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 						'query',
 						'clear',
 					].forEach((method) => {
-						methodsToAdd[method] = entity[method];
+						index === 0
+							? (this[method] = entity[method])
+							: (methodsToAdd[method] = entity[method]);
 					});
 					/**
-					 * apply entity methods to this.adapter.entityName
+					 * apply entity methods object to this.adapter.entityName
 					 */
-					this[entityName] = methodsToAdd;
-				});
-
-				/**
-				 * Base Entity
-				 */
-				const methodNames = entityMethods(baseEntity);
-
-				/**
-				 * set entity methods on this.adapter
-				 * for active record pattern
-				 */
-				methodNames.forEach((method) => {
-					this[method] = baseEntity[method];
-				});
-
-				/**
-				 * set base entity methods on this.adapter
-				 * for active record pattern
-				 */
-				[
-					'hasId',
-					'save',
-					'remove',
-					'softRemove',
-					'recover',
-					'reload',
-					'useDataSource',
-					'target',
-					'getId',
-					'createQueryBuilder',
-					'create',
-					'merge',
-					'preload',
-					'insert',
-					'update',
-					'delete',
-					'count',
-					'countBy',
-					'sum',
-					'average',
-					'minimum',
-					'maximum',
-					'find',
-					'findBy',
-					'findAndCount',
-					'findAndCountBy',
-					'findOne',
-					'findOneBy',
-					'findOneOrFail',
-					'findOneByOrFail',
-					'query',
-					'clear',
-				].forEach((method) => {
-					this[method] = baseEntity[method];
+					index !== 0 ? (this[entityName] = methodsToAdd) : null;
 				});
 
 				/**
 				 * set entity manager on this.adapter
 				 */
 				this.manager = db.manager;
-				// this.manager = this.db.manager;
+
 				/**
 				 * set repository on this.adapter
 				 */
-				this.repository = db.getRepository(
-					isArray(this._entity) ? this._entity[0] : this._entity,
-				);
-				// this.repository = this.db.getRepository(
-				// 	isArray(this._entity) ? this._entity[0] : this._entity,
-				// );
+				this.repository = db.getRepository(entityArrray[0]);
 
+				/**
+				 * set datasource on this.adapter
+				 */
 				this.dataSource = datasource;
-				// return datasource;
 			})
 			.catch((err: any) => {
 				this.broker.logger.error(`Error initializing database: ${err.message}`);
