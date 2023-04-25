@@ -1,7 +1,7 @@
 {
-	"name": "moleculer-db-typeorm-adapter",
+	"name": "@tyrsolutions/moleculer-db-typeorm-adapter",
 	"version": "1.0.0",
-	"description": "",
+	"description": "TypeORM adapter for moleculer",
 	"main": "dist/index.js",
 	"module": "dist/index.esm.js",
 	"types": "dist/index.d.ts",
