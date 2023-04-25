@@ -2,7 +2,7 @@
 
 import { ServiceBroker } from 'moleculer';
 import ProductService from '../service/test.service';
-import { rimrafSync } from 'rimraf';
+import { rimraf } from 'rimraf';
 import 'jest-extended';
 import 'jest-chain';
 
@@ -12,8 +12,8 @@ describe('Test MyService', () => {
 
 	beforeAll(() => broker.start());
 	afterAll(async () => {
-		rimrafSync('../../temp');
 		await broker.stop();
+		await rimraf('temp');
 	});
 
 	it('should be created', () => {
