@@ -41,19 +41,21 @@ service: {
         database: 'temp/test.db',
         synchronize: true,
         logging: ['query', 'error'],
-        entities: [TypeProduct],
+        // entities: [TypeProduct], no longer needed entities are pulled from model and added
     }),
 
     model: TypeProduct || [TypeProduct, TypeProduct2], // accepts single entity or array of entities. Must be added to entities in TypeORMDbAdapter object
     ...
 }
 ```
+
+### Active Record
 Entity:
 ```js
 import { BaseEntity, Entity, PrimaryGeneratedColumn, Column } from "typeorm"
 
 @Entity()
-export class User extends BaseEntity {
+export class User extends BaseEntity { // class extending BaseEntity
     @PrimaryGeneratedColumn()
     id: number
 
@@ -86,6 +88,37 @@ this.adapter.create(user)
 
 // use static method functions from entity, no additional setup needed
 this.adapter.findByName("John", "Doe")
+```
+
+### Data Mapping
+Entity:
+```js
+import { BaseEntity, Entity, PrimaryGeneratedColumn, Column } from "typeorm"
+
+@Entity()
+export class User { // class not extending BaseEntity
+    @PrimaryGeneratedColumn()
+    id: number
+
+    @Column()
+    firstName: string
+
+    @Column()
+    lastName: string
+
+    @Column()
+    isActive: boolean
+}
+```
+In service actions, methods, etc. (anywhere this.adapter can be used):
+```js
+const user = new User()
+user.firstName = "John";
+user.lastName = "Doe";
+user.active = true;
+
+// no need to create new object with entity, just pass one
+this.adapter.User.repository.create(user);
 ```
 
 ## Test

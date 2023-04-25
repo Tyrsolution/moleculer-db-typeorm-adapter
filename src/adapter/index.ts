@@ -134,10 +134,15 @@ export class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 		 * set connection manager on this.adapter
 		 */
 		this.connectionManager = new ConnectionManager();
-		// this.db = await this.connectionManager.create(this.opts);
+
+		/**
+		 * create connection using this.opts
+		 */
+		const connectionOpts = cloneDeep(this.opts);
+		connectionOpts.entities = isArray(this._entity) ? this._entity : [this._entity];
+		this.opts = connectionOpts;
 		const db = await this.connectionManager.create(this.opts);
 
-		// return await this.db
 		return await db
 			.initialize()
 			.then((datasource: any) => {
