@@ -11,7 +11,7 @@
 		"ci": "jest --watch",
 		"clean": "yarn clean:packages && yarn install",
 		"clean:packages": "rm -fr yarn.lock package-lock.json dist node_modules",
-		"generateDocumentation": "node ./docgen/index.js -t ./templates/README.md -s ./dist/adapter/index.js,./dist/adapter/connectionManager/index.js -d README.md",
+		"generateDocumentation": "node ./docgen/index.js -t ./templates/README.md -s ./dist/index.js -d README.md",
 		"test": "jest --coverage",
 		"lint": "eslint --ext=.js src test",
 		"deps": "npm-check -u",

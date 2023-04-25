@@ -31,13 +31,13 @@ if (!flags.destination) {
 const file = flags.service;
 
 function parseWithJsDoc(file) {
-	console.log('file: ', file);
 	const jsdoc = require('jsdoc-api');
 
 	console.log(chalk.yellow.bold('Parse service file...'));
 	console.log('  File: ' + chalk.white.bold(file) + '\n');
 
-	let doc = jsdoc.explainSync({ files: [file.split(',')[0], file.split(',')[1]] });
+	const filesToParse = !file.includes(',') ? [file] : [file.split(',')[0], file.split(',')[1]];
+	let doc = jsdoc.explainSync({ files: filesToParse });
 	return doc;
 }
 /*
