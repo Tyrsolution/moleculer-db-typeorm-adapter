@@ -197,6 +197,7 @@ export class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 					/**
 					 * add entity local methods to this.adapter or methods object
 					 */
+
 					[
 						'hasId',
 						'save',
@@ -238,7 +239,13 @@ export class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 					/**
 					 * apply entity methods object to this.adapter.entityName
 					 */
-					index !== 0 ? (this[entityName] = methodsToAdd) : null;
+					!entity['save']
+						? this.broker.logger.warn(
+								`Entity class ${entityName} does not extend TypeORM BaseEntity, use data mapping with this.adapter.repository instead of active record methodology.`,
+						  )
+						: index !== 0
+						? (this[entityName] = methodsToAdd)
+						: null;
 				});
 
 				/**
