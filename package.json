@@ -17,7 +17,7 @@
 		"deps": "npm-check -u",
 		"coverall": "cat ./coverage/lcov.info | ./node_modules/coveralls/bin/coveralls.js",
 		"postversion": "git push && git push --follow-tags",
-		"build": "yarn build:clean && run-p build:dts build:dist",
+		"build": "yarn build:clean && run-p build:dist",
 		"build:clean": "rimraf dist bin",
 		"build:dist": "rollup -c",
 		"build:dts": "dts-bundle-generator -o dist/index.d.ts src/index.ts",
@@ -71,6 +71,7 @@
 		"rimraf": "^5.0.0",
 		"rollup": "^3.21.0",
 		"rollup-plugin-auto-external": "^2.0.0",
+		"rollup-plugin-dts-bundle": "^1.0.0",
 		"rollup-plugin-esbuild": "^5.0.0",
 		"rollup-plugin-node-builtins": "^2.1.2",
 		"ts-jest": "^29.1.0",
@@ -110,6 +111,7 @@
 	"dependencies": {
 		"bluebird": "^3.7.2",
 		"lodash": "^4.17.21",
+		"tslib": "^2.5.0",
 		"typeorm": "^0.3.15"
 	},
 	"publishConfig": {

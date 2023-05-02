@@ -1,9 +1,11 @@
 /*
- * moleculerModule
- * Copyright (c) 2023 MoleculerJS (https://github.com/Matthew Marino/moleculerModule)
+ * moleculer-db-typeorm-adapter
+ * Copyright (c) 2023 TyrSoluitons (https://github.com/Matthew Marino/moleculerModule)
  * MIT Licensed
  */
 
 'use strict';
-
-export { TypeORMDbAdapter } from './adapter';
+import 'reflect-metadata';
+import TypeORMDbAdapter from './adapter';
+// export { TypeORMDbAdapter } from './adapter';
+export default TypeORMDbAdapter;

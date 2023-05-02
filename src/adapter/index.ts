@@ -6,7 +6,7 @@
 
 'use strict';
 import 'reflect-metadata';
-import { cloneDeep, isArray } from 'lodash';
+import { isArray } from 'lodash';
 import { resolve } from 'bluebird';
 import { Service, ServiceBroker, Errors } from 'moleculer';
 import {
@@ -16,6 +16,7 @@ import {
 	EntitySchema,
 	ObjectLiteral,
 	Repository,
+	FindOneOptions,
 } from 'typeorm';
 import ConnectionManager from './connectionManager';
 
@@ -44,7 +45,7 @@ import ConnectionManager from './connectionManager';
  * }
  * ```
  */
-export class TypeORMDbAdapter<Entity extends ObjectLiteral> {
+export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	// Dynamic property key
 	[index: string]: any;
 	/**
@@ -56,7 +57,7 @@ export class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 *
 	 * @properties
 	 */
-	static connectionManager: ConnectionManager | undefined;
+	connectionManager: ConnectionManager | undefined;
 	private _entity: EntitySchema<Entity> | Array<EntitySchema<Entity>> | undefined;
 	private dataSource: DataSource | undefined;
 	/**
@@ -134,15 +135,20 @@ export class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 		 * set connection manager on this.adapter
 		 */
 		this.connectionManager = new ConnectionManager();
-
+		/**
+		 * set connection opts
+		 */
+		this.opts = {
+			...this.opts,
+			entities: isArray(this._entity) ? this._entity : [this._entity],
+		};
 		/**
 		 * create connection using this.opts
 		 */
-		const connectionOpts = cloneDeep(this.opts);
-		connectionOpts.entities = isArray(this._entity) ? this._entity : [this._entity];
-		this.opts = connectionOpts;
 		const db = await this.connectionManager.create(this.opts);
-
+		/**
+		 * initialize db connection
+		 */
 		return await db
 			.initialize()
 			.then((datasource: any) => {
@@ -150,6 +156,9 @@ export class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 					`${this.service.name} has connected to ${datasource.name} database`,
 				);
 
+				/**
+				 * array of entities
+				 */
 				const entityArrray: { [key: string]: any } = isArray(this._entity)
 					? (this._entity as unknown as DataSource)
 					: [this._entity as unknown as DataSource];
@@ -211,6 +220,7 @@ export class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 						'recover',
 						'reload',
 						'useDataSource',
+						// 'getRepository', // causing issue with typeormdbadapter class getRepository
 						'target',
 						'getId',
 						'createQueryBuilder',
@@ -219,6 +229,7 @@ export class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 						'preload',
 						'insert',
 						'update',
+						'upsert',
 						'delete',
 						'count',
 						'countBy',
@@ -237,6 +248,10 @@ export class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 						'query',
 						'clear',
 					].forEach((method) => {
+						/**
+						 * add base entity methods to this.adapter if index === 0
+						 * or add additional methods to methods object
+						 */
 						index === 0
 							? (this[method] = entity[method])
 							: (methodsToAdd[method] = entity[method]);
@@ -249,7 +264,7 @@ export class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 								`Entity class ${entityName} does not extend TypeORM BaseEntity, use data mapping with this.adapter.repository instead of active record methodology.`,
 						  )
 						: index !== 0
-						? (this[entityName] = methodsToAdd)
+						? (this[entityName] = { ...methodsToAdd })
 						: null;
 				});
 
@@ -261,7 +276,10 @@ export class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 				/**
 				 * set repository on this.adapter
 				 */
-				this.repository = db.getRepository(entityArrray[0]);
+				this.repository = db.getRepository(
+					isArray(this._entity) ? this._entity[0] : this._entity!,
+				);
+				// this.repository = db.getRepository(entityArrray[0]);
 
 				/**
 				 * set datasource on this.adapter
@@ -282,11 +300,11 @@ export class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 *
 	 * @returns {Promise}
 	 */
-	async disconnect(): Promise<any> {
-		await this.connectionManager!.connections.forEach((connection: DataSource) => {
+	disconnect(): Promise<any> {
+		this.connectionManager!.connections.forEach(async (connection: DataSource) => {
 			this.broker.logger.info(`Attempting to disconnect from database ${connection.name}...`);
-			this.connectionManager!.close(connection.name)
-				.then((disconnected: boolean) =>
+			await this.connectionManager!.close(connection.name)
+				.then((disconnected: any) =>
 					disconnected === true
 						? this.broker.logger.info(`Disconnected from database ${connection.name}`)
 						: this.broker.logger.info(
@@ -329,58 +347,22 @@ export class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 		return dataSource.getRepository(isArray(this._entity!) ? this._entity[0] : this._entity!);
 	}
 
-	/** Moleculer-db methods */
-
 	/**
-	 * Convert DB entity to JSON object
+	 * Gets item by id.
+	 * Needed for active record to work from base entity and
+
 	 *
 	 * @methods
-	 * @public
-	 * @param {any} entity
-	 * @returns {Object}
+	 * @param {Partial<T>} key - id key of entity
+	 * @param {string | number} id - id of entity
+	 * @returns {Promise<T | undefined>}
 	 *
 	 */
-	entityToObject(entity: any): object {
-		return entity;
-	}
-
-	/**
-	 * Transforms 'idField' into NeDB's '_id'
-	 *
-	 * @methods
-	 * @public
-	 * @param {Object} entity
-	 * @param {String} idField
-	 *
-	 * @returns {Object} Modified entity
-	 *
-	 */
-	beforeSaveTransformID(entity: Record<string, any>, idField: string): object {
-		let newEntity = cloneDeep(entity);
-
-		if (idField !== '_id' && entity[idField] !== undefined) {
-			newEntity._id = newEntity[idField];
-			delete newEntity[idField];
-		}
-
-		return newEntity;
-	}
-
-	/**
-	 * Transforms NeDB's '_id' into user defined 'idField'
-	 *
-	 * @methods
-	 * @public
-	 * @param {Object} entity
-	 * @param {String} idField
-	 * @returns {Object} Modified entity
-	 *
-	 */
-	afterRetrieveTransformID(entity: Record<string, any>, idField: string): object {
-		if (idField !== '_id') {
-			entity[idField] = entity['_id'];
-			delete entity._id;
-		}
-		return entity;
+	async findById<T extends Entity>(
+		key: string,
+		id: string | number,
+		relations?: FindOneOptions<T>,
+	): Promise<T | undefined> {
+		return await this['findOne']({ where: { [key]: id }, ...relations });
 	}
 }
