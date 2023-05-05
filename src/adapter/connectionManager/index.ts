@@ -141,14 +141,6 @@ export default class ConnectionManager {
 	async create(options: DataSourceOptions): Promise<DataSource> {
 		// check if such connection is already registered
 		const existConnection = this.connectionMap.get(options.name || 'default');
-		/* if (existConnection) {
-			// if connection is registered and its not closed then throw an error
-			if (existConnection.isInitialized)
-				throw new AlreadyHasActiveConnectionError(
-					options.name || "default"
-				);
-		} */
-
 		const throwError = () => {
 			const error = new AlreadyHasActiveConnectionError(options.name || 'default');
 			throw new Errors.MoleculerServerError(
@@ -157,15 +149,124 @@ export default class ConnectionManager {
 				'ERR_CONNECTION_ALREADY_EXIST',
 			);
 		};
-
-		const connection =
+		/**
+		 * array of entities
+		 */
+		// const entityArrray: any = options.entities;
+		const dbConnection: any =
 			existConnection && existConnection.isInitialized
 				? throwError()
 				: new DataSource(options);
+		const activeConneciton: any = await dbConnection
+			.initialize()
+			.then((dataConnection: any) => dataConnection)
+			.catch((err: any) => {
+				throw new Errors.MoleculerServerError(err.message, 500, 'ERR_CONNECTION_CREATE');
+			});
 
+		// /**
+		//  * get entity methods
+		//  *
+		//  * @param {Object} obj -- entity object
+		//  * @returns {Array<string>}
+		//  */
+		// const entityMethods = (obj: { [key: string]: any } = {}) => {
+		// 	const members = Object.getOwnPropertyNames(obj);
+		// 	const methods = members.filter((el) => {
+		// 		return typeof obj[el] === 'function';
+		// 	});
+		// 	return methods;
+		// };
+
+		// /**
+		//  * add additional entities and methods to adapter
+		//  * under entity name this.adapter.entityName
+		//  */
+		// entityArrray.forEach((entity: any, index: number) => {
+		// 	const dbRepository = activeConneciton.getRepository(entity);
+		// 	const entityName = dbRepository.metadata.name;
+		// 	const methodNames = entityMethods(entity);
+		// 	/**
+		// 	 * object for entity methods to this.adapter.entityName
+		// 	 * getRepository function required for this to work
+		// 	 */
+		// 	const methodsToAdd: { [key: string]: any } = {
+		// 		manager: dbRepository.manager,
+		// 		repository: dbRepository,
+		// 		getRepository: function getRepository() {
+		// 			const dataSource = dbConnection;
+		// 			if (!dataSource) throw new Error(`DataSource is not set for this entity.`);
+		// 			return dataSource.getRepository(entity);
+		// 		},
+		// 	};
+		// 	/**
+		// 	 * add base entity methods to this.adapter
+		// 	 * or add additional methods to methods object
+		// 	 */
+		// 	methodNames.forEach((method) => {
+		// 		index === 0
+		// 			? (dbConnection[method] = entity[method])
+		// 			: (methodsToAdd[method] = entity[method]);
+		// 	});
+		// 	/**
+		// 	 * add entity local methods to this.adapter or methods object
+		// 	 */
+
+		// 	[
+		// 		'hasId',
+		// 		'save',
+		// 		'remove',
+		// 		'softRemove',
+		// 		'recover',
+		// 		'reload',
+		// 		'useDataSource',
+		// 		// 'getRepository', // causing issue with typeormdbadapter class getRepository
+		// 		'target',
+		// 		'getId',
+		// 		'createQueryBuilder',
+		// 		'create',
+		// 		'merge',
+		// 		'preload',
+		// 		'insert',
+		// 		'update',
+		// 		'upsert',
+		// 		'delete',
+		// 		'count',
+		// 		'countBy',
+		// 		'sum',
+		// 		'average',
+		// 		'minimum',
+		// 		'maximum',
+		// 		'find',
+		// 		'findBy',
+		// 		'findAndCount',
+		// 		'findAndCountBy',
+		// 		'findOne',
+		// 		'findOneBy',
+		// 		'findOneOrFail',
+		// 		'findOneByOrFail',
+		// 		'query',
+		// 		'clear',
+		// 	].forEach((method) => {
+		// 		/**
+		// 		 * add base entity methods to this.adapter if index === 0
+		// 		 * or add additional methods to methods object
+		// 		 */
+		// 		index === 0
+		// 			? (dbConnection[method] = entity[method])
+		// 			: (methodsToAdd[method] = entity[method]);
+		// 	});
+		// 	/**
+		// 	 * apply entity methods object to this.adapter.entityName
+		// 	 */
+		// 	/* !entity['save']
+		// 		? this.broker.logger.warn(
+		// 				`Entity class ${entityName} does not extend TypeORM BaseEntity, use data mapping with this.adapter.repository instead of active record methodology.`,
+		// 		  )
+		// 		: */ index !== 0 ? (dbConnection[entityName] = { ...methodsToAdd }) : null;
+		// });
 		// create a new connection
-		// const connection = new DataSource(options);
-		this.connectionMap.set(connection.name, connection);
-		return Promise.resolve(connection);
+		this.connectionMap.set(dbConnection.name, dbConnection);
+		return Promise.resolve(activeConneciton);
 	}
 }

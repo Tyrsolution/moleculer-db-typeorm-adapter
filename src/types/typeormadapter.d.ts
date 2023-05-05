@@ -96,6 +96,7 @@ declare class ConnectionManager {
 }
 
 export interface DbAdapter<Entity extends ObjectLiteral> {
+	[key: string]: any;
 	/**
 	 * TypeORM Entity Repository
 	 */
