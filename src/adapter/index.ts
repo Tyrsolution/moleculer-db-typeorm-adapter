@@ -379,11 +379,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 * @returns {Promise<T | undefined>}
 	 *
 	 */
-	async findByIds<T extends Entity>(
-		key: string,
-		ids: any[],
-		relations?: FindOneOptions<T>,
-	): Promise<T | undefined> {
-		return await this['findby']({ where: { [key]: In([...ids]) }, ...relations });
+	async findByIds<T extends Entity>(key: string, ids: any[]): Promise<T | undefined> {
+		return await this['findBy']({ [key]: In([...ids]) });
 	}
 }

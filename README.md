@@ -41,10 +41,10 @@ service: {
         database: 'temp/test.db',
         synchronize: true,
         logging: ['query', 'error'],
-        // entities: [TypeProduct], no longer needed entities are pulled from model and added. Providing one override model:
+        // entities: [TypeProduct], no longer needed entities are pulled from model and added. Providing one here will override model:
     }),
 
-    model: TypeProduct || [TypeProduct, TypeProduct2], // accepts single entity or array of entities. Must be added to entities in TypeORMDbAdapter object
+    model: TypeProduct || [TypeProduct, TypeProduct2], // accepts single entity or array of entities.
     ...
 }
 ```
@@ -292,51 +292,53 @@ Used internally by this.adapter for base conection.
 
 
 
-## `entityToObject` 
+## `findByIdWO` 
 
-Convert DB entity to JSON object
-
-### Parameters
-| Property | Type | Default | Description |
-| -------- | ---- | ------- | ----------- |
-| `entity` | `any` | **required** |  |
-
-### Results
-**Type:** `Object`
-
-
-
-
-## `beforeSaveTransformID` 
-
-Transforms 'idField' into NeDB's '_id'
+Gets item by id. Can use find options
 
 ### Parameters
 | Property | Type | Default | Description |
 | -------- | ---- | ------- | ----------- |
-| `entity` | `Object` | **required** |  |
-| `idField` | `String` | **required** |  |
+| `key` | `Partial.<T>` | **required** | primary column name |
+| `id` | `string`, `number` | **required** | id of entity |
+| `findOptions` | `Object` | **required** | find options, like relations, order, etc. No where clause |
 
 ### Results
-**Type:** `Object`
-
-Modified entity
+**Type:** `Promise.<(T|undefined)>`
 
 
-## `afterRetrieveTransformID` 
 
-Transforms NeDB's '_id' into user defined 'idField'
+
+## `findById` 
+
+Gets item by id. No find options
 
 ### Parameters
 | Property | Type | Default | Description |
 | -------- | ---- | ------- | ----------- |
-| `entity` | `Object` | **required** |  |
-| `idField` | `String` | **required** |  |
+| `key` | `Partial.<T>` | **required** | primary column name |
+| `id` | `string`, `number` | **required** | id of entity |
 
 ### Results
-**Type:** `Object`
+**Type:** `Promise.<(T|undefined)>`
 
-Modified entity
+
+
+
+## `findByIds` 
+
+Gets items by id.
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `key` | `Partial.<T>` | **required** | primary column name |
+| `ids` | `Array.<string>`, `Array.<number>` | **required** | ids of entity |
+
+### Results
+**Type:** `Promise.<(T|undefined)>`
+
+
 
 
 <!-- AUTO-CONTENT-END:METHODS -->
