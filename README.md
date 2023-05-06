@@ -41,7 +41,7 @@ service: {
         database: 'temp/test.db',
         synchronize: true,
         logging: ['query', 'error'],
-        // entities: [TypeProduct], no longer needed entities are pulled from model and added
+        // entities: [TypeProduct], no longer needed entities are pulled from model and added. Providing one override model:
     }),
 
     model: TypeProduct || [TypeProduct, TypeProduct2], // accepts single entity or array of entities. Must be added to entities in TypeORMDbAdapter object
@@ -117,8 +117,19 @@ user.firstName = "John";
 user.lastName = "Doe";
 user.active = true;
 
+// create new object with entity then save
+this.adapter.User.repository.save(user);
+
+// or
+
+const user = {
+    "firstName": "John",
+    "lastName": "Doe",
+    "active": true
+}
+
 // no need to create new object with entity, just pass one
-this.adapter.User.repository.create(user);
+this.adapter.User.repository.save(user);
 ```
 
 ## Test

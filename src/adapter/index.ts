@@ -6,7 +6,7 @@
 
 'use strict';
 import 'reflect-metadata';
-import { isArray } from 'lodash';
+import { has, isArray, isUndefined } from 'lodash';
 import { resolve } from 'bluebird';
 import { Service, ServiceBroker, Errors } from 'moleculer';
 import {
@@ -20,6 +20,14 @@ import {
 } from 'typeorm';
 import ConnectionManager from './connectionManager';
 
+interface additionalFunctions {
+	[index: string]: any;
+	findById: <T extends ObjectLiteral>(
+		key: string,
+		id: string | number,
+		relations?: FindOneOptions<T>,
+	) => Promise<T | undefined>;
+}
 /**
  * Moleculer TypeORM Adapter
  *
@@ -115,8 +123,10 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 					entityArray.push(entity);
 			  }),
 			  (this._entity = entityArray))
-			: !!entityFromService.constructor
+			: !isUndefined(entityFromService) && !!entityFromService.constructor
 			? (this._entity = entityFromService)
+			: has(this.opts, 'entities')
+			? (this._entity = [...this.opts.entities])
 			: new Errors.MoleculerServerError('Invalid model. It should be a typeorm repository');
 	}
 
@@ -255,7 +265,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 						`Entity class ${entityName} does not extend TypeORM BaseEntity, use data mapping with this.adapter.repository instead of active record methodology.`,
 				  )
 				: index !== 0
-				? (this[entityName] = { ...methodsToAdd })
+				? (this[entityName] = { ...methodsToAdd, findById: this.findById })
 				: null;
 		});
 
