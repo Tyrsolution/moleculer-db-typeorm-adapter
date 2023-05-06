@@ -426,19 +426,42 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	clear<T extends Entity>(this: { new (): T }): Promise<void>;
 	/** additional custom methods */
 	/**
-	 * Gets item by id.
-	 * Needed for active record to work from base entity and
-
+	 * Gets item by id. Can use find options
 	 *
 	 * @methods
-	 * @param {string} key - id key of entity
+	 * @param {Partial<T>} key - primary column name
+	 * @param {string | number} id - id of entity
+	 * @param {Object} findOptions - find options, like relations, order, etc. No where clause
+	 * @returns {Promise<T | undefined>}
+	 *
+	 */
+	findByIdWO<T extends Entity>(
+		key: string,
+		id: string | number,
+		findOptions?: FindOneOptions<T>,
+	): Promise<T | undefined>;
+	/**
+	 * Gets item by id. No relations
+	 *
+	 * @methods
+	 * @param {string} key - primary column name
 	 * @param {string | number} id - id of entity
 	 * @returns {Promise<T | undefined>}
 	 *
 	 */
-	findById<T extends Entity>(
+	findById<T extends Entity>(key: string, id: string | number): Promise<T | undefined>;
+	/**
+	 * Gets items by ids.
+	 *
+	 * @methods
+	 * @param {string} key - primary column name
+	 * @param {Array<any>} ids - id of entity
+	 * @returns {Promise<T | undefined>}
+	 *
+	 */
+	findByIds<T extends Entity>(
 		key: string,
-		id: string | number,
+		id: any[],
 		relations?: FindOneOptions<T>,
 	): Promise<T | undefined>;
 }
@@ -879,19 +902,42 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	afterRetrieveTransformID(entity: Record<string, any>, idField: string): object;
 	/** additional custom methods */
 	/**
-	 * Gets item by id.
-	 * Needed for active record to work from base entity and
-
+	 * Gets item by id. Can use find options
 	 *
 	 * @methods
-	 * @param {string} key - id key of entity
+	 * @param {Partial<T>} key - primary column name
+	 * @param {string | number} id - id of entity
+	 * @param {Object} findOptions - find options, like relations, order, etc. No where clause
+	 * @returns {Promise<T | undefined>}
+	 *
+	 */
+	findByIdWO<T extends Entity>(
+		key: string,
+		id: string | number,
+		findOptions?: FindOneOptions<T>,
+	): Promise<T | undefined>;
+	/**
+	 * Gets item by id. No relations
+	 *
+	 * @methods
+	 * @param {string} key - primary column name
 	 * @param {string | number} id - id of entity
 	 * @returns {Promise<T | undefined>}
 	 *
 	 */
-	findById<T extends Entity>(
+	findById<T extends Entity>(key: string, id: string | number): Promise<T | undefined>;
+	/**
+	 * Gets items by ids.
+	 *
+	 * @methods
+	 * @param {string} key - primary column name
+	 * @param {Array<any>} ids - id of entity
+	 * @returns {Promise<T | undefined>}
+	 *
+	 */
+	findByIds<T extends Entity>(
 		key: string,
-		id: string | number,
+		id: any[],
 		relations?: FindOneOptions<T>,
 	): Promise<T | undefined>;
 }

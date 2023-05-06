@@ -17,17 +17,10 @@ import {
 	ObjectLiteral,
 	Repository,
 	FindOneOptions,
+	In,
 } from 'typeorm';
 import ConnectionManager from './connectionManager';
 
-interface additionalFunctions {
-	[index: string]: any;
-	findById: <T extends ObjectLiteral>(
-		key: string,
-		id: string | number,
-		relations?: FindOneOptions<T>,
-	) => Promise<T | undefined>;
-}
 /**
  * Moleculer TypeORM Adapter
  *
@@ -265,7 +258,11 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 						`Entity class ${entityName} does not extend TypeORM BaseEntity, use data mapping with this.adapter.repository instead of active record methodology.`,
 				  )
 				: index !== 0
-				? (this[entityName] = { ...methodsToAdd, findById: this.findById })
+				? (this[entityName] = {
+						...methodsToAdd,
+						findById: this.findById,
+						findByIds: this.findByIds,
+				  })
 				: null;
 		});
 
@@ -343,21 +340,50 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	}
 
 	/**
-	 * Gets item by id.
-	 * Needed for active record to work from base entity and
-
+	 * Gets item by id. Can use find options
 	 *
 	 * @methods
-	 * @param {Partial<T>} key - id key of entity
+	 * @param {Partial<T>} key - primary column name
+	 * @param {string | number} id - id of entity
+	 * @param {Object} findOptions - find options, like relations, order, etc. No where clause
+	 * @returns {Promise<T | undefined>}
+	 *
+	 */
+	async findByIdWO<T extends Entity>(
+		key: string,
+		id: string | number,
+		findOptions?: FindOneOptions<T>,
+	): Promise<T | undefined> {
+		return await this['findOne']({ where: { [key]: In([id]) }, ...findOptions });
+	}
+
+	/**
+	 * Gets item by id. No find options
+	 *
+	 * @methods
+	 * @param {Partial<T>} key - primary column name
 	 * @param {string | number} id - id of entity
 	 * @returns {Promise<T | undefined>}
 	 *
 	 */
-	async findById<T extends Entity>(
+	async findById<T extends Entity>(key: string, id: string | number): Promise<T | undefined> {
+		return await this['findOneBy']({ [key]: In([id]) });
+	}
+
+	/**
+	 * Gets items by id.
+	 *
+	 * @methods
+	 * @param {Partial<T>} key - primary column name
+	 * @param {Array<string> | Array<number>} ids - ids of entity
+	 * @returns {Promise<T | undefined>}
+	 *
+	 */
+	async findByIds<T extends Entity>(
 		key: string,
-		id: string | number,
+		ids: any[],
 		relations?: FindOneOptions<T>,
 	): Promise<T | undefined> {
-		return await this['findOne']({ where: { [key]: id }, ...relations });
+		return await this['findby']({ where: { [key]: In([...ids]) }, ...relations });
 	}
 }
