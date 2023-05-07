@@ -341,6 +341,54 @@ Gets items by id.
 
 
 
+## `list` 
+
+List entities by filters and pagination results.
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `ctx` | `Context` | **required** | Context instance. |
+| `params` | `Object` | - | Parameters. |
+
+### Results
+**Type:** `Object`
+
+List of found entities and count.
+
+
+## `transformDocuments` 
+
+Transform the fetched documents
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `ctx` | `Context` | **required** |  |
+| `params` | `Object` | **required** |  |
+| `docs` | `Array`, `Object` | **required** |  |
+
+### Results
+**Type:** `Array`, `Object`
+
+
+
+
+## `validateEntity` 
+
+Validate an entity by validator.
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `entity` | `Object` | **required** |  |
+
+### Results
+**Type:** `Promise`
+
+
+
+
 <!-- AUTO-CONTENT-END:METHODS -->
 
 <!-- AUTO-CONTENT-TEMPLATE:METHODS

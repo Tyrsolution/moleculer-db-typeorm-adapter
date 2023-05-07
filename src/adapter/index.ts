@@ -6,8 +6,22 @@
 
 'use strict';
 import 'reflect-metadata';
-import { has, isArray, isUndefined } from 'lodash';
-import { resolve } from 'bluebird';
+import {
+	cloneDeep,
+	compact,
+	flattenDeep,
+	get,
+	has,
+	isArray,
+	isFunction,
+	isObject,
+	isString,
+	isUndefined,
+	set,
+	uniq,
+	unset,
+} from 'lodash';
+import { all, method, resolve } from 'bluebird';
 import { Service, ServiceBroker, Errors } from 'moleculer';
 import {
 	DataSource,
@@ -262,6 +276,14 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 						...methodsToAdd,
 						findById: this.findById,
 						findByIds: this.findByIds,
+						list: this.list,
+						transformDocuments: this.transformDocuments,
+						filterFields: this.filterFields,
+						excludeFields: this.excludeFields,
+						_excludeFields: this._excludeFields,
+						populateDocs: this.populateDocs,
+						validateEntity: this.validateEntity,
+						entityToObject: this.entityToObject,
 				  })
 				: null;
 		});
@@ -381,5 +403,351 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 */
 	async findByIds<T extends Entity>(key: string, ids: any[]): Promise<T | undefined> {
 		return await this['findBy']({ [key]: In([...ids]) });
+	}
+
+	/**
+	 * List entities by filters and pagination results.
+	 *
+	 * @methods
+	 *
+	 * @param {Context} ctx - Context instance.
+	 * @param {Object?} params - Parameters.
+	 *
+	 * @returns {Object} List of found entities and count.
+	 */
+	list(ctx: any, params: any) {
+		let countParams = Object.assign({}, params);
+		// Remove pagination params
+		if (countParams && countParams.limit) countParams.limit = null;
+		if (countParams && countParams.offset) countParams.offset = null;
+		if (params.limit == null) {
+			if (this.settings.limit > 0 && params.pageSize > this.settings.limit)
+				params.limit = this.settings.limit;
+			else params.limit = params.pageSize;
+		}
+		return all([
+			// Get rows
+			this.adapter.find(params),
+			// Get count of all rows
+			this.adapter.count(countParams),
+		]).then((res) => {
+			return this.transformDocuments(ctx, params, res[0]).then((docs: any) => {
+				return {
+					// Rows
+					rows: docs,
+					// Total rows
+					total: res[1],
+					// Page
+					page: params.page,
+					// Page size
+					pageSize: params.pageSize,
+					// Total pages
+					totalPages: Math.floor((res[1] + params.pageSize - 1) / params.pageSize),
+				};
+			});
+		});
+	}
+
+	/**
+	 * Transform the fetched documents
+	 * @methods
+	 * @param {Context} ctx
+	 * @param {Object} 	params
+	 * @param {Array|Object} docs
+	 * @returns {Array|Object}
+	 */
+	transformDocuments(ctx: any, params: any, docs: any) {
+		let isDoc = false;
+		if (!Array.isArray(docs)) {
+			if (isObject(docs)) {
+				isDoc = true;
+				docs = [docs];
+			} else return resolve(docs);
+		}
+
+		return (
+			resolve(docs)
+				// Convert entity to JS object
+				.then((docs) => docs.map((doc: any) => this.adapter.entityToObject(doc)))
+
+				// Apply idField
+				.then((docs) =>
+					docs.map((doc: any) =>
+						this.adapter.afterRetrieveTransformID(doc, this.settings.idField),
+					),
+				)
+				// Encode IDs
+				.then((docs) =>
+					docs.map((doc: { [x: string]: any }) => {
+						doc[this.settings.idField] = this.encodeID(doc[this.settings.idField]);
+						return doc;
+					}),
+				)
+				// Populate
+				.then((json) =>
+					ctx && params.populate ? this.populateDocs(ctx, json, params.populate) : json,
+				)
+
+				// TODO onTransformHook
+
+				// Filter fields
+				.then((json) => {
+					if (ctx && params.fields) {
+						const fields = isString(params.fields)
+							? // Compatibility with < 0.4
+							  /* istanbul ignore next */
+							  params.fields.split(/\s+/)
+							: params.fields;
+						// Authorize the requested fields
+						const authFields = this.authorizeFields(fields);
+
+						return json.map((item: any) => this.filterFields(item, authFields));
+					} else {
+						return json.map((item: any) =>
+							this.filterFields(item, this.settings.fields),
+						);
+					}
+				})
+
+				// Filter excludeFields
+				.then((json) => {
+					const askedExcludeFields =
+						ctx && params.excludeFields
+							? isString(params.excludeFields)
+								? params.excludeFields.split(/\s+/)
+								: params.excludeFields
+							: [];
+					const excludeFields = askedExcludeFields.concat(
+						this.settings.excludeFields || [],
+					);
+
+					if (Array.isArray(excludeFields) && excludeFields.length > 0) {
+						return json.map((doc: any) => {
+							return this._excludeFields(doc, excludeFields);
+						});
+					} else {
+						return json;
+					}
+				})
+
+				// Return
+				.then((json) => (isDoc ? json[0] : json))
+		);
+	}
+
+	/**
+	 * Filter fields in the entity object
+	 *
+	 * @param {Object} 	doc
+	 * @param {Array<String>} 	fields	Filter properties of model.
+	 * @returns	{Object}
+	 */
+	filterFields(doc: any, fields: any[]) {
+		// Apply field filter (support nested paths)
+		if (Array.isArray(fields)) {
+			let res = {};
+			fields.forEach((n) => {
+				const v = get(doc, n);
+				if (v !== undefined) set(res, n, v);
+			});
+			return res;
+		}
+
+		return doc;
+	}
+
+	/**
+	 * Exclude fields in the entity object
+	 *
+	 * @param {Object} 	doc
+	 * @param {Array<String>} 	fields	Exclude properties of model.
+	 * @returns	{Object}
+	 */
+	excludeFields(doc: any, fields: string | any[]) {
+		if (Array.isArray(fields) && fields.length > 0) {
+			return this._excludeFields(doc, fields);
+		}
+
+		return doc;
+	}
+
+	/**
+	 * Exclude fields in the entity object. Internal use only, must ensure `fields` is an Array
+	 */
+	_excludeFields(doc: any, fields: any[]) {
+		const res = cloneDeep(doc);
+		fields.forEach((field) => {
+			unset(res, field);
+		});
+		return res;
+	}
+
+	/**
+	 * Populate documents.
+	 *
+	 * @param {Context} 		ctx
+	 * @param {Array|Object} 	docs
+	 * @param {Array?}			populateFields
+	 * @returns	{Promise}
+	 */
+	populateDocs(ctx: any, docs: any, populateFields?: any[]) {
+		if (
+			!this.settings.populates ||
+			!Array.isArray(populateFields) ||
+			populateFields.length == 0
+		)
+			return resolve(docs);
+
+		if (docs == null || (!isObject(docs) && !Array.isArray(docs))) return resolve(docs);
+
+		const settingPopulateFields = Object.keys(this.settings.populates);
+
+		/* Group populateFields by populatesFields for deep population.
+			(e.g. if "post" in populates and populateFields = ["post.author", "post.reviewer", "otherField"])
+			then they would be grouped together: { post: ["post.author", "post.reviewer"], otherField:["otherField"]}
+			*/
+		const groupedPopulateFields = populateFields.reduce((obj, populateField) => {
+			const settingPopulateField = settingPopulateFields.find(
+				(settingPopulateField) =>
+					settingPopulateField === populateField ||
+					populateField.startsWith(settingPopulateField + '.'),
+			);
+			if (settingPopulateField != null) {
+				if (obj[settingPopulateField] == null) {
+					obj[settingPopulateField] = [populateField];
+				} else {
+					obj[settingPopulateField].push(populateField);
+				}
+			}
+			return obj;
+		}, {});
+
+		let promises = [];
+		for (const populatesField of settingPopulateFields) {
+			let rule = this.settings.populates[populatesField];
+			if (groupedPopulateFields[populatesField] == null) continue; // skip
+
+			// if the rule is a function, save as a custom handler
+			if (isFunction(rule)) {
+				rule = {
+					handler: method(rule),
+				};
+			}
+
+			// If the rule is string, convert to object
+			if (isString(rule)) {
+				rule = {
+					action: rule,
+				};
+			}
+
+			if (rule.field === undefined) rule.field = populatesField;
+
+			let arr = Array.isArray(docs) ? docs : [docs];
+
+			// Collect IDs from field of docs (flatten, compact & unique list)
+			let idList = uniq(flattenDeep(compact(arr.map((doc) => get(doc, rule.field)))));
+			// Replace the received models according to IDs in the original docs
+			const resultTransform = (populatedDocs: { [x: string]: any }) => {
+				arr.forEach((doc) => {
+					let id = get(doc, rule.field);
+					if (isArray(id)) {
+						let models = compact(id.map((id) => populatedDocs[id]));
+						set(doc, populatesField, models);
+					} else {
+						set(doc, populatesField, populatedDocs[id]);
+					}
+				});
+			};
+
+			if (rule.handler) {
+				promises.push(rule.handler.call(this, idList, arr, rule, ctx));
+			} else if (idList.length > 0) {
+				// Call the target action & collect the promises
+				const params = Object.assign(
+					{
+						id: idList,
+						mapping: true,
+						populate: [
+							// Transform "post.author" into "author" to pass to next populating service
+							...groupedPopulateFields[populatesField]
+								.map((populateField: string | any[]) =>
+									populateField.slice(populatesField.length + 1),
+								) //+1 to also remove any leading "."
+								.filter((field: string) => field !== ''),
+							...(rule.populate ? rule.populate : []),
+						],
+					},
+					rule.params || {},
+				);
+
+				if (params.populate.length === 0) {
+					delete params.populate;
+				}
+
+				promises.push(ctx.call(rule.action, params).then(resultTransform));
+			}
+		}
+
+		return all(promises).then(() => docs);
+	}
+
+	/**
+	 * Validate an entity by validator.
+	 * @methods
+	 * @param {Object} entity
+	 * @returns {Promise}
+	 */
+	validateEntity(entity: any) {
+		if (!isFunction(this.settings.entityValidator)) return resolve(entity);
+
+		let entities = Array.isArray(entity) ? entity : [entity];
+		return all(entities.map((entity) => this.settings.entityValidator.call(this, entity))).then(
+			() => entity,
+		);
+	}
+
+	/**
+	 * Convert DB entity to JSON object
+	 *
+	 * @param {any} entity
+	 * @returns {Object}
+	 * @memberof MemoryDbAdapter
+	 */
+	entityToObject(entity: any) {
+		return entity;
+	}
+
+	/**
+	 * Transforms 'idField' into NeDB's '_id'
+	 * @param {Object} entity
+	 * @param {String} idField
+	 * @memberof MemoryDbAdapter
+	 * @returns {Object} Modified entity
+	 */
+	beforeSaveTransformID(entity: any, idField: string) {
+		let newEntity = cloneDeep(entity);
+
+		if (idField !== '_id' && entity[idField] !== undefined) {
+			newEntity._id = newEntity[idField];
+			delete newEntity[idField];
+		}
+
+		return newEntity;
+	}
+
+	/**
+	 * Transforms NeDB's '_id' into user defined 'idField'
+	 * @param {Object} entity
+	 * @param {String} idField
+	 * @memberof MemoryDbAdapter
+	 * @returns {Object} Modified entity
+	 */
+	afterRetrieveTransformID(entity: any, idField: string) {
+		if (idField !== '_id') {
+			entity[idField] = entity['_id'];
+			delete entity._id;
+		}
+		return entity;
 	}
 }

@@ -464,6 +464,68 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 		id: any[],
 		relations?: FindOneOptions<T>,
 	): Promise<T | undefined>;
+	/**
+	 * List entities by filters and pagination results.
+	 *
+	 * @methods
+	 *
+	 * @param {Context} ctx - Context instance.
+	 * @param {Object?} params - Parameters.
+	 *
+	 * @returns {Object} List of found entities and count.
+	 */
+	list(ctx: any, params: any): Promise<any>;
+	/**
+	 * Filter fields in the entity object
+	 *
+	 * @param {Object} 	doc
+	 * @param {Array<String>} 	fields	Filter properties of model.
+	 * @returns	{Object}
+	 */
+	filterFields(doc: any, fields: any[]): any;
+	/**
+	 * Exclude fields in the entity object
+	 *
+	 * @param {Object} 	doc
+	 * @param {Array<String>} 	fields	Exclude properties of model.
+	 * @returns	{Object}
+	 */
+	excludeFields(doc: any, fields: string | any[]): any;
+	/**
+	 * Exclude fields in the entity object. Internal use only, must ensure `fields` is an Array
+	 */
+	_excludeFields(doc: any, fields: any[]): any;
+	/**
+	 * Validate an entity by validator.
+	 * @methods
+	 * @param {Object} entity
+	 * @returns {Promise}
+	 */
+	validateEntity(entity: any): Promise<any>;
+	/**
+	 * Convert DB entity to JSON object
+	 *
+	 * @param {any} entity
+	 * @returns {Object}
+	 * @memberof MemoryDbAdapter
+	 */
+	entityToObject(entity: any): any;
+	/**
+	 * Transforms 'idField' into NeDB's '_id'
+	 * @param {Object} entity
+	 * @param {String} idField
+	 * @memberof MemoryDbAdapter
+	 * @returns {Object} Modified entity
+	 */
+	beforeSaveTransformID(entity: any, idField: string): any;
+	/**
+	 * Transforms NeDB's '_id' into user defined 'idField'
+	 * @param {Object} entity
+	 * @param {String} idField
+	 * @memberof MemoryDbAdapter
+	 * @returns {Object} Modified entity
+	 */
+	afterRetrieveTransformID(entity: any, idField: string): any;
 }
 
 export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements DbAdapter<Entity> {
@@ -940,4 +1002,66 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 		id: any[],
 		relations?: FindOneOptions<T>,
 	): Promise<T | undefined>;
+	/**
+	 * List entities by filters and pagination results.
+	 *
+	 * @methods
+	 *
+	 * @param {Context} ctx - Context instance.
+	 * @param {Object?} params - Parameters.
+	 *
+	 * @returns {Object} List of found entities and count.
+	 */
+	list(ctx: any, params: any): Promise<any>;
+	/**
+	 * Filter fields in the entity object
+	 *
+	 * @param {Object} 	doc
+	 * @param {Array<String>} 	fields	Filter properties of model.
+	 * @returns	{Object}
+	 */
+	filterFields(doc: any, fields: any[]): any;
+	/**
+	 * Exclude fields in the entity object
+	 *
+	 * @param {Object} 	doc
+	 * @param {Array<String>} 	fields	Exclude properties of model.
+	 * @returns	{Object}
+	 */
+	excludeFields(doc: any, fields: string | any[]): any;
+	/**
+	 * Exclude fields in the entity object. Internal use only, must ensure `fields` is an Array
+	 */
+	_excludeFields(doc: any, fields: any[]): any;
+	/**
+	 * Validate an entity by validator.
+	 * @methods
+	 * @param {Object} entity
+	 * @returns {Promise}
+	 */
+	validateEntity(entity: any): Promise<any>;
+	/**
+	 * Convert DB entity to JSON object
+	 *
+	 * @param {any} entity
+	 * @returns {Object}
+	 * @memberof MemoryDbAdapter
+	 */
+	entityToObject(entity: any): any;
+	/**
+	 * Transforms 'idField' into NeDB's '_id'
+	 * @param {Object} entity
+	 * @param {String} idField
+	 * @memberof MemoryDbAdapter
+	 * @returns {Object} Modified entity
+	 */
+	beforeSaveTransformID(entity: any, idField: string): any;
+	/**
+	 * Transforms NeDB's '_id' into user defined 'idField'
+	 * @param {Object} entity
+	 * @param {String} idField
+	 * @memberof MemoryDbAdapter
+	 * @returns {Object} Modified entity
+	 */
+	afterRetrieveTransformID(entity: any, idField: string): any;
 }
