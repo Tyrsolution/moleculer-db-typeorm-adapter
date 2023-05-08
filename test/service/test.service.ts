@@ -12,9 +12,9 @@ import {
 } from '@ourparentcenter/moleculer-decorators-extended';
 
 import DBService from 'moleculer-db';
-import { TypeORMDbAdapter } from '../../src';
-import { TypeProduct } from '../entities/product.entity';
-import { TypeProduct2 } from '../entities/product2.entity';
+import TypeORMDbAdapter from '../../src';
+import { TypeProduct } from '../../examples/entities/product.entity';
+import { TypeProduct2 } from '../../examples/entities/product2.entity';
 
 const validateRoleBase: ActionParams = {
 	name: { type: 'string', optional: true },

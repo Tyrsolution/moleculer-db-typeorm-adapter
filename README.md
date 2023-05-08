@@ -41,10 +41,10 @@ service: {
         database: 'temp/test.db',
         synchronize: true,
         logging: ['query', 'error'],
-        // entities: [TypeProduct], no longer needed entities are pulled from model and added
+        // entities: [TypeProduct], no longer needed entities are pulled from model and added. Providing one here will override model:
     }),
 
-    model: TypeProduct || [TypeProduct, TypeProduct2], // accepts single entity or array of entities. Must be added to entities in TypeORMDbAdapter object
+    model: TypeProduct || [TypeProduct, TypeProduct2], // accepts single entity or array of entities.
     ...
 }
 ```
@@ -117,8 +117,19 @@ user.firstName = "John";
 user.lastName = "Doe";
 user.active = true;
 
+// create new object with entity then save
+this.adapter.User.repository.save(user);
+
+// or
+
+const user = {
+    "firstName": "John",
+    "lastName": "Doe",
+    "active": true
+}
+
 // no need to create new object with entity, just pass one
-this.adapter.User.repository.create(user);
+this.adapter.User.repository.save(user);
 ```
 
 ## Test
@@ -219,8 +230,8 @@ _<sup>Since: {{this}}</sup>_
 <!-- AUTO-CONTENT-START:METHODS -->
 ## `init` 
 
-Initialize adapter
-It will be called in `broker.start()` and is used internally
+Initialize adapter.
+It will be called in `broker.start()` and is used internally.
 
 ### Parameters
 | Property | Type | Default | Description |
@@ -281,6 +292,247 @@ Used internally by this.adapter for base conection.
 
 
 
+## `findByIdWO` 
+
+Gets item by id. Can use find options
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `key` | `Partial.<T>` | **required** | primary column name |
+| `id` | `string`, `number` | **required** | id of entity |
+| `findOptions` | `Object` | **required** | find options, like relations, order, etc. No where clause |
+
+### Results
+**Type:** `Promise.<(T|undefined)>`
+
+
+
+
+## `findById` 
+
+Gets item by id. No find options
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `key` | `Partial.<T>` | **required** | primary column name |
+| `id` | `string`, `number` | **required** | id of entity |
+
+### Results
+**Type:** `Promise.<(T|undefined)>`
+
+
+
+
+## `findByIds` 
+
+Gets items by id.
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `key` | `Partial.<T>` | **required** | primary column name |
+| `ids` | `Array.<string>`, `Array.<number>` | **required** | ids of entity |
+
+### Results
+**Type:** `Promise.<(T|undefined)>`
+
+
+
+
+## `list` 
+
+List entities by filters and pagination results.
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `ctx` | `Context` | **required** | Context instance. |
+| `params` | `Object` | - | Parameters. |
+
+### Results
+**Type:** `Object`
+
+List of found entities and count.
+
+
+## `afterRetrieveTransformID` 
+
+Transforms NeDB's '_id' into user defined 'idField'
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `entity` | `Object` | **required** |  |
+| `idField` | `String` | **required** |  |
+
+### Results
+**Type:** `Object`
+
+Modified entity
+
+
+## `encodeID` 
+
+Encode ID of entity.
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `id` | `any` | **required** |  |
+
+### Results
+**Type:** `any`
+
+
+
+
+## `decodeID` 
+
+Decode ID of entity.
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `id` | `any` | **required** |  |
+
+### Results
+**Type:** `any`
+
+
+
+
+## `transformDocuments` 
+
+Transform the fetched documents
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `ctx` | `Context` | **required** |  |
+| `params` | `Object` | **required** |  |
+| `docs` | `Array`, `Object` | **required** |  |
+
+### Results
+**Type:** `Array`, `Object`
+
+
+
+
+## `beforeEntityChange` 
+
+Call before entity lifecycle events
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `type` | `String` | **required** |  |
+| `entity` | `Object` | **required** |  |
+| `ctx` | `Context` | **required** |  |
+
+### Results
+**Type:** `Promise`
+
+
+
+
+## `entityChanged` 
+
+Clear the cache & call entity lifecycle events
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `type` | `String` | **required** |  |
+| `json` | `Object`, `Array.<Object>`, `Number` | **required** |  |
+| `ctx` | `Context` | **required** |  |
+
+### Results
+**Type:** `Promise`
+
+
+
+
+## `clearCache` 
+
+Clear cached entities
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+*No input parameters.*
+
+### Results
+**Type:** `Promise`
+
+
+
+
+## `filterFields` 
+
+Filter fields in the entity object
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `doc` | `Object` | **required** |  |
+| `fields` | `Array.<String>` | **required** | Filter properties of model. |
+
+### Results
+**Type:** `Object`
+
+
+
+
+## `excludeFields` 
+
+Exclude fields in the entity object
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `doc` | `Object` | **required** |  |
+| `fields` | `Array.<String>` | **required** | Exclude properties of model. |
+
+### Results
+**Type:** `Object`
+
+
+
+
+## `populateDocs` 
+
+Populate documents.
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `ctx` | `Context` | **required** |  |
+| `docs` | `Array`, `Object` | **required** |  |
+| `populateFields` | `Array` | - |  |
+
+### Results
+**Type:** `Promise`
+
+
+
+
+## `validateEntity` 
+
+Validate an entity by validator.
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `entity` | `Object` | **required** |  |
+
+### Results
+**Type:** `Promise`
+
+
+
+
 ## `entityToObject` 
 
 Convert DB entity to JSON object
@@ -312,20 +564,35 @@ Transforms 'idField' into NeDB's '_id'
 Modified entity
 
 
-## `afterRetrieveTransformID` 
+## `authorizeFields` 
 
-Transforms NeDB's '_id' into user defined 'idField'
+Authorize the required field list. Remove fields which is not exist in the `this.settings.fields`
 
 ### Parameters
 | Property | Type | Default | Description |
 | -------- | ---- | ------- | ----------- |
-| `entity` | `Object` | **required** |  |
-| `idField` | `String` | **required** |  |
+| `askedFields` | `Array` | **required** |  |
 
 ### Results
-**Type:** `Object`
+**Type:** `Array`
 
-Modified entity
+
+
+
+## `updateById` 
+
+Update an entity by ID
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `id` | `any` | **required** |  |
+| `update` | `Object` | **required** |  |
+
+### Results
+**Type:** `Promise`
+
+
 
 
 <!-- AUTO-CONTENT-END:METHODS -->

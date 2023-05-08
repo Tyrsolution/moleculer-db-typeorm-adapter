@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="jest tests" tests="2" failures="0" errors="0" time="14.054">
+  <testsuite name="Test MyService" errors="0" failures="0" skipped="0" timestamp="2023-05-08T21:54:34" time="13.684" tests="2">
+    <testcase classname="Test MyService should be created" name="Test MyService should be created" time="0.008">
+    </testcase>
+    <testcase classname="Test MyService should return with created object" name="Test MyService should return with created object" time="0.24">
+    </testcase>
+  </testsuite>
+</testsuites>

@@ -3,8 +3,8 @@
 		"allowSyntheticDefaultImports": true,
 		"declaration": true,
 		"emitDecoratorMetadata": true,
-		"esModuleInterop": true,
 		"experimentalDecorators": true,
+		"esModuleInterop": true,
 		"lib": ["ESNext", "es2017", "es2016", "es6", "es2015", "dom"],
 		"module": "CommonJS",
 		"moduleResolution": "node",
@@ -27,11 +27,11 @@
 		"traceResolution": false,
 		"types": ["jest", "node"],
 		"outDir": "dist",
-		"baseUrl": ".",
+		"baseUrl": "./src",
 		"paths": {
 			"*": ["src/*"]
 		}
 	},
-	"include": ["src/**/*", "test/**/*.ts", ".eslintrc.js"],
-	"exclude": ["node_modules/**/*", "test"]
+	"include": ["src/**/*", "test/**/*.ts", ".eslintrc.js", "examples/**/*.ts"],
+	"exclude": ["node_modules/**/*"]
 }

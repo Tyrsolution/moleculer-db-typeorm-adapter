@@ -96,6 +96,7 @@ declare class ConnectionManager {
 }
 
 export interface DbAdapter<Entity extends ObjectLiteral> {
+	[key: string]: any;
 	/**
 	 * TypeORM Entity Repository
 	 */
@@ -425,21 +426,190 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	clear<T extends Entity>(this: { new (): T }): Promise<void>;
 	/** additional custom methods */
 	/**
-	 * Gets item by id.
-	 * Needed for active record to work from base entity and
-
+	 * Gets item by id. Can use find options
 	 *
 	 * @methods
-	 * @param {string} key - id key of entity
+	 * @param {Partial<T>} key - primary column name
+	 * @param {string | number} id - id of entity
+	 * @param {Object} findOptions - find options, like relations, order, etc. No where clause
+	 * @returns {Promise<T | undefined>}
+	 *
+	 */
+	findByIdWO<T extends Entity>(
+		key: string,
+		id: string | number,
+		findOptions?: FindOneOptions<T>,
+	): Promise<T | undefined>;
+
+	/**
+	 * Gets item by id. No find options
+	 *
+	 * @methods
+	 * @param {Partial<T>} key - primary column name
 	 * @param {string | number} id - id of entity
 	 * @returns {Promise<T | undefined>}
 	 *
 	 */
-	findById<T extends Entity>(
-		key: string,
-		id: string | number,
-		relations?: FindOneOptions<T>,
-	): Promise<T | undefined>;
+	findById<T extends Entity>(key: string, id: string | number): Promise<T | undefined>;
+	/**
+	 * Gets items by id.
+	 *
+	 * @methods
+	 * @param {Partial<T>} key - primary column name
+	 * @param {Array<string> | Array<number>} ids - ids of entity
+	 * @returns {Promise<T | undefined>}
+	 *
+	 */
+	findByIds<T extends Entity>(key: string, ids: any[]): Promise<T | undefined>;
+	/**
+	 * List entities by filters and pagination results.
+	 *
+	 * @methods
+	 *
+	 * @param {Context} ctx - Context instance.
+	 * @param {Object?} params - Parameters.
+	 *
+	 * @returns {Object} List of found entities and count.
+	 */
+	list(ctx: any, params: any): Promise<any>;
+
+	/**
+	 * Transforms NeDB's '_id' into user defined 'idField'
+	 * @param {Object} entity
+	 * @param {String} idField
+	 * @memberof MemoryDbAdapter
+	 * @returns {Object} Modified entity
+	 */
+	afterRetrieveTransformID(entity: any, idField: string): any;
+
+	/**
+	 * Encode ID of entity.
+	 *
+	 * @methods
+	 * @param {any} id
+	 * @returns {any}
+	 */
+	encodeID(id: any): any;
+
+	/**
+	 * Decode ID of entity.
+	 *
+	 * @methods
+	 * @param {any} id
+	 * @returns {any}
+	 */
+	decodeID(id: any): any;
+
+	/**
+	 * Transform the fetched documents
+	 * @methods
+	 * @param {Context} ctx
+	 * @param {Object} 	params
+	 * @param {Array|Object} docs
+	 * @returns {Array|Object}
+	 */
+	transformDocuments(ctx: any, params: any, docs: any): any;
+
+	/**
+	 * Call before entity lifecycle events
+	 *
+	 * @methods
+	 * @param {String} type
+	 * @param {Object} entity
+	 * @param {Context} ctx
+	 * @returns {Promise}
+	 */
+	beforeEntityChange(type: string | undefined, entity: any, ctx: any): Promise<any>;
+
+	/**
+	 * Clear the cache & call entity lifecycle events
+	 *
+	 * @methods
+	 * @param {String} type
+	 * @param {Object|Array<Object>|Number} json
+	 * @param {Context} ctx
+	 * @returns {Promise}
+	 */
+	entityChanged(type: string | undefined, json: any, ctx: any): Promise<any>;
+	/**
+	 * Clear cached entities
+	 *
+	 * @methods
+	 * @returns {Promise}
+	 */
+	clearCache(): Promise<any>;
+	/**
+	 * Filter fields in the entity object
+	 *
+	 * @param {Object} 	doc
+	 * @param {Array<String>} 	fields	Filter properties of model.
+	 * @returns	{Object}
+	 */
+	filterFields(doc: any, fields: any[]): any;
+	/**
+	 * Exclude fields in the entity object
+	 *
+	 * @param {Object} 	doc
+	 * @param {Array<String>} 	fields	Exclude properties of model.
+	 * @returns	{Object}
+	 */
+	excludeFields(doc: any, fields: string | any[]): any;
+
+	/**
+	 * Exclude fields in the entity object. Internal use only, must ensure `fields` is an Array
+	 */
+	_excludeFields(doc: any, fields: any[]): any;
+
+	/**
+	 * Populate documents.
+	 *
+	 * @param {Context} 		ctx
+	 * @param {Array|Object} 	docs
+	 * @param {Array?}			populateFields
+	 * @returns	{Promise}
+	 */
+	populateDocs(ctx: any, docs: any, populateFields?: any[]): Promise<any>;
+	/**
+	 * Validate an entity by validator.
+	 * @methods
+	 * @param {Object} entity
+	 * @returns {Promise}
+	 */
+	validateEntity(entity: any): Promise<any>;
+
+	/**
+	 * Convert DB entity to JSON object
+	 *
+	 * @param {any} entity
+	 * @returns {Object}
+	 * @memberof MemoryDbAdapter
+	 */
+	entityToObject(entity: any): any;
+
+	/**
+	 * Transforms 'idField' into NeDB's '_id'
+	 * @param {Object} entity
+	 * @param {String} idField
+	 * @memberof MemoryDbAdapter
+	 * @returns {Object} Modified entity
+	 */
+	beforeSaveTransformID(entity: any, idField: string): any;
+	/**
+	 * Authorize the required field list. Remove fields which is not exist in the `this.settings.fields`
+	 *
+	 * @param {Array} askedFields
+	 * @returns {Array}
+	 */
+	authorizeFields(askedFields: any[]): any[];
+	/**
+	 * Update an entity by ID
+	 *
+	 * @param {any} id
+	 * @param {Object} update
+	 * @returns {Promise}
+	 * @memberof MemoryDbAdapter
+	 */
+	updateById(id: any, update: any): Promise<any>;
 }
 
 export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements DbAdapter<Entity> {
@@ -878,19 +1048,188 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	afterRetrieveTransformID(entity: Record<string, any>, idField: string): object;
 	/** additional custom methods */
 	/**
-	 * Gets item by id.
-	 * Needed for active record to work from base entity and
-
+	 * Gets item by id. Can use find options
 	 *
 	 * @methods
-	 * @param {string} key - id key of entity
+	 * @param {Partial<T>} key - primary column name
+	 * @param {string | number} id - id of entity
+	 * @param {Object} findOptions - find options, like relations, order, etc. No where clause
+	 * @returns {Promise<T | undefined>}
+	 *
+	 */
+	findByIdWO<T extends Entity>(
+		key: string,
+		id: string | number,
+		findOptions?: FindOneOptions<T>,
+	): Promise<T | undefined>;
+
+	/**
+	 * Gets item by id. No find options
+	 *
+	 * @methods
+	 * @param {Partial<T>} key - primary column name
 	 * @param {string | number} id - id of entity
 	 * @returns {Promise<T | undefined>}
 	 *
 	 */
-	findById<T extends Entity>(
-		key: string,
-		id: string | number,
-		relations?: FindOneOptions<T>,
-	): Promise<T | undefined>;
+	findById<T extends Entity>(key: string, id: string | number): Promise<T | undefined>;
+	/**
+	 * Gets items by id.
+	 *
+	 * @methods
+	 * @param {Partial<T>} key - primary column name
+	 * @param {Array<string> | Array<number>} ids - ids of entity
+	 * @returns {Promise<T | undefined>}
+	 *
+	 */
+	findByIds<T extends Entity>(key: string, ids: any[]): Promise<T | undefined>;
+	/**
+	 * List entities by filters and pagination results.
+	 *
+	 * @methods
+	 *
+	 * @param {Context} ctx - Context instance.
+	 * @param {Object?} params - Parameters.
+	 *
+	 * @returns {Object} List of found entities and count.
+	 */
+	list(ctx: any, params: any): Promise<any>;
+
+	/**
+	 * Transforms NeDB's '_id' into user defined 'idField'
+	 * @param {Object} entity
+	 * @param {String} idField
+	 * @memberof MemoryDbAdapter
+	 * @returns {Object} Modified entity
+	 */
+	afterRetrieveTransformID(entity: any, idField: string): any;
+
+	/**
+	 * Encode ID of entity.
+	 *
+	 * @methods
+	 * @param {any} id
+	 * @returns {any}
+	 */
+	encodeID(id: any): any;
+
+	/**
+	 * Decode ID of entity.
+	 *
+	 * @methods
+	 * @param {any} id
+	 * @returns {any}
+	 */
+	decodeID(id: any): any;
+
+	/**
+	 * Transform the fetched documents
+	 * @methods
+	 * @param {Context} ctx
+	 * @param {Object} 	params
+	 * @param {Array|Object} docs
+	 * @returns {Array|Object}
+	 */
+	transformDocuments(ctx: any, params: any, docs: any): any;
+
+	/**
+	 * Call before entity lifecycle events
+	 *
+	 * @methods
+	 * @param {String} type
+	 * @param {Object} entity
+	 * @param {Context} ctx
+	 * @returns {Promise}
+	 */
+	beforeEntityChange(type: string | undefined, entity: any, ctx: any): Promise<any>;
+
+	/**
+	 * Clear the cache & call entity lifecycle events
+	 *
+	 * @methods
+	 * @param {String} type
+	 * @param {Object|Array<Object>|Number} json
+	 * @param {Context} ctx
+	 * @returns {Promise}
+	 */
+	entityChanged(type: string | undefined, json: any, ctx: any): Promise<any>;
+	/**
+	 * Clear cached entities
+	 *
+	 * @methods
+	 * @returns {Promise}
+	 */
+	clearCache(): Promise<any>;
+	/**
+	 * Filter fields in the entity object
+	 *
+	 * @param {Object} 	doc
+	 * @param {Array<String>} 	fields	Filter properties of model.
+	 * @returns	{Object}
+	 */
+	filterFields(doc: any, fields: any[]): any;
+	/**
+	 * Exclude fields in the entity object
+	 *
+	 * @param {Object} 	doc
+	 * @param {Array<String>} 	fields	Exclude properties of model.
+	 * @returns	{Object}
+	 */
+	excludeFields(doc: any, fields: string | any[]): any;
+
+	/**
+	 * Exclude fields in the entity object. Internal use only, must ensure `fields` is an Array
+	 */
+	_excludeFields(doc: any, fields: any[]): any;
+
+	/**
+	 * Populate documents.
+	 *
+	 * @param {Context} 		ctx
+	 * @param {Array|Object} 	docs
+	 * @param {Array?}			populateFields
+	 * @returns	{Promise}
+	 */
+	populateDocs(ctx: any, docs: any, populateFields?: any[]): Promise<any>;
+	/**
+	 * Validate an entity by validator.
+	 * @methods
+	 * @param {Object} entity
+	 * @returns {Promise}
+	 */
+	validateEntity(entity: any): Promise<any>;
+
+	/**
+	 * Convert DB entity to JSON object
+	 *
+	 * @param {any} entity
+	 * @returns {Object}
+	 * @memberof MemoryDbAdapter
+	 */
+	entityToObject(entity: any): any;
+
+	/**
+	 * Transforms 'idField' into NeDB's '_id'
+	 * @param {Object} entity
+	 * @param {String} idField
+	 * @memberof MemoryDbAdapter
+	 * @returns {Object} Modified entity
+	 */
+	beforeSaveTransformID(entity: any, idField: string): any;
+	/**
+	 * Authorize the required field list. Remove fields which is not exist in the `this.settings.fields`
+	 *
+	 * @param {Array} askedFields
+	 * @returns {Array}
+	 */
+	authorizeFields(askedFields: any[]): any[];
+	/**
+	 * Update an entity by ID
+	 *
+	 * @param {any} id
+	 * @param {Object} update
+	 * @returns {Promise}
+	 * @memberof MemoryDbAdapter
+	 */
+	updateById(id: any, update: any): Promise<any>;
 }
