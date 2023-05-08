@@ -21,3 +21,4 @@ docgen/
 rollup.config.mjs
 tsconfig.json
 .prettierrc
+junit.xml
