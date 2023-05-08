@@ -7,6 +7,7 @@
 'use strict';
 import 'reflect-metadata';
 import {
+	capitalize,
 	cloneDeep,
 	compact,
 	flattenDeep,
@@ -274,16 +275,26 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 				: index !== 0
 				? (this[entityName] = {
 						...methodsToAdd,
+						findByIdWO: this.findByIdWO,
 						findById: this.findById,
 						findByIds: this.findByIds,
 						list: this.list,
+						afterRetrieveTransformID: this.afterRetrieveTransformID,
+						encodeID: this.encodeID,
+						decodeID: this.decodeID,
 						transformDocuments: this.transformDocuments,
+						beforeEntityChange: this.beforeEntityChange,
+						entityChanged: this.entityChanged,
+						clearCache: this.clearCache,
 						filterFields: this.filterFields,
 						excludeFields: this.excludeFields,
 						_excludeFields: this._excludeFields,
 						populateDocs: this.populateDocs,
 						validateEntity: this.validateEntity,
 						entityToObject: this.entityToObject,
+						beforeSaveTransformID: this.beforeSaveTransformID,
+						authorizeFields: this.authorizeFields,
+						updateById: this.updateById,
 				  })
 				: null;
 		});
@@ -415,7 +426,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 *
 	 * @returns {Object} List of found entities and count.
 	 */
-	list(ctx: any, params: any) {
+	list(ctx: any, params: any): object {
 		let countParams = Object.assign({}, params);
 		// Remove pagination params
 		if (countParams && countParams.limit) countParams.limit = null;
@@ -430,8 +441,8 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 			this.adapter.find(params),
 			// Get count of all rows
 			this.adapter.count(countParams),
-		]).then((res) => {
-			return this.transformDocuments(ctx, params, res[0]).then((docs: any) => {
+		]).then(async (res) => {
+			return await this.transformDocuments(ctx, params, res[0]).then((docs: any) => {
 				return {
 					// Rows
 					rows: docs,
@@ -449,6 +460,43 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	}
 
 	/**
+	 * Transforms NeDB's '_id' into user defined 'idField'
+	 * @param {Object} entity
+	 * @param {String} idField
+	 * @memberof MemoryDbAdapter
+	 * @returns {Object} Modified entity
+	 */
+	afterRetrieveTransformID(entity: any, idField: string): object {
+		if (idField !== '_id') {
+			entity[idField] = entity['_id'];
+			delete entity._id;
+		}
+		return entity;
+	}
+
+	/**
+	 * Encode ID of entity.
+	 *
+	 * @methods
+	 * @param {any} id
+	 * @returns {any}
+	 */
+	encodeID(id: any): any {
+		return id;
+	}
+
+	/**
+	 * Decode ID of entity.
+	 *
+	 * @methods
+	 * @param {any} id
+	 * @returns {any}
+	 */
+	decodeID(id: any): any {
+		return id;
+	}
+
+	/**
 	 * Transform the fetched documents
 	 * @methods
 	 * @param {Context} ctx
@@ -456,7 +504,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 * @param {Array|Object} docs
 	 * @returns {Array|Object}
 	 */
-	transformDocuments(ctx: any, params: any, docs: any) {
+	transformDocuments(ctx: any, params: any, docs: any): Promise<Array<any> | object> {
 		let isDoc = false;
 		if (!Array.isArray(docs)) {
 			if (isObject(docs)) {
@@ -536,13 +584,60 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	}
 
 	/**
+	 * Call before entity lifecycle events
+	 *
+	 * @methods
+	 * @param {String} type
+	 * @param {Object} entity
+	 * @param {Context} ctx
+	 * @returns {Promise}
+	 */
+	beforeEntityChange(type: string | undefined, entity: any, ctx: any): Promise<any> {
+		const eventName = `beforeEntity${capitalize(type)}`;
+		if (this.schema[eventName] == null) {
+			return resolve(entity);
+		}
+		return resolve(this.schema[eventName].call(this, entity, ctx));
+	}
+
+	/**
+	 * Clear the cache & call entity lifecycle events
+	 *
+	 * @methods
+	 * @param {String} type
+	 * @param {Object|Array<Object>|Number} json
+	 * @param {Context} ctx
+	 * @returns {Promise}
+	 */
+	async entityChanged(type: string | undefined, json: any, ctx: any): Promise<any> {
+		return await this.clearCache().then(async () => {
+			const eventName = `entity${capitalize(type)}`;
+			if (this.schema[eventName] != null) {
+				return await this.schema[eventName].call(this, json, ctx);
+			}
+		});
+	}
+
+	/**
+	 * Clear cached entities
+	 *
+	 * @methods
+	 * @returns {Promise}
+	 */
+	clearCache(): Promise<any> {
+		this.broker[this.settings.cacheCleanEventType](`cache.clean.${this.fullName}`);
+		if (this.broker.cacher) return this.broker.cacher.clean(`${this.fullName}.**`);
+		return resolve();
+	}
+
+	/**
 	 * Filter fields in the entity object
 	 *
 	 * @param {Object} 	doc
 	 * @param {Array<String>} 	fields	Filter properties of model.
 	 * @returns	{Object}
 	 */
-	filterFields(doc: any, fields: any[]) {
+	filterFields(doc: any, fields: any[]): object {
 		// Apply field filter (support nested paths)
 		if (Array.isArray(fields)) {
 			let res = {};
@@ -563,7 +658,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 * @param {Array<String>} 	fields	Exclude properties of model.
 	 * @returns	{Object}
 	 */
-	excludeFields(doc: any, fields: string | any[]) {
+	excludeFields(doc: any, fields: string | any[]): object {
 		if (Array.isArray(fields) && fields.length > 0) {
 			return this._excludeFields(doc, fields);
 		}
@@ -590,7 +685,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 * @param {Array?}			populateFields
 	 * @returns	{Promise}
 	 */
-	populateDocs(ctx: any, docs: any, populateFields?: any[]) {
+	populateDocs(ctx: any, docs: any, populateFields?: any[]): Promise<any> {
 		if (
 			!this.settings.populates ||
 			!Array.isArray(populateFields) ||
@@ -698,7 +793,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 * @param {Object} entity
 	 * @returns {Promise}
 	 */
-	validateEntity(entity: any) {
+	validateEntity(entity: any): Promise<any> {
 		if (!isFunction(this.settings.entityValidator)) return resolve(entity);
 
 		let entities = Array.isArray(entity) ? entity : [entity];
@@ -714,7 +809,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 * @returns {Object}
 	 * @memberof MemoryDbAdapter
 	 */
-	entityToObject(entity: any) {
+	entityToObject(entity: any): object {
 		return entity;
 	}
 
@@ -725,7 +820,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 * @memberof MemoryDbAdapter
 	 * @returns {Object} Modified entity
 	 */
-	beforeSaveTransformID(entity: any, idField: string) {
+	beforeSaveTransformID(entity: any, idField: string): object {
 		let newEntity = cloneDeep(entity);
 
 		if (idField !== '_id' && entity[idField] !== undefined) {
@@ -737,17 +832,56 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	}
 
 	/**
-	 * Transforms NeDB's '_id' into user defined 'idField'
-	 * @param {Object} entity
-	 * @param {String} idField
-	 * @memberof MemoryDbAdapter
-	 * @returns {Object} Modified entity
+	 * Authorize the required field list. Remove fields which is not exist in the `this.settings.fields`
+	 *
+	 * @param {Array} askedFields
+	 * @returns {Array}
 	 */
-	afterRetrieveTransformID(entity: any, idField: string) {
-		if (idField !== '_id') {
-			entity[idField] = entity['_id'];
-			delete entity._id;
+	authorizeFields(askedFields: any[]): Array<any> {
+		if (this.settings.fields && this.settings.fields.length > 0) {
+			let allowedFields: any[] = [];
+			if (Array.isArray(askedFields) && askedFields.length > 0) {
+				askedFields.forEach((askedField) => {
+					if (this.settings.fields.indexOf(askedField) !== -1) {
+						allowedFields.push(askedField);
+						return;
+					}
+
+					if (askedField.indexOf('.') !== -1) {
+						let parts = askedField.split('.');
+						while (parts.length > 1) {
+							parts.pop();
+							if (this.settings.fields.indexOf(parts.join('.')) !== -1) {
+								allowedFields.push(askedField);
+								return;
+							}
+						}
+					}
+
+					let nestedFields = this.settings.fields.filter((settingField: string) =>
+						settingField.startsWith(askedField + '.'),
+					);
+					if (nestedFields.length > 0) {
+						allowedFields = allowedFields.concat(nestedFields);
+					}
+				});
+				//return _.intersection(f, this.settings.fields);
+			}
+			return allowedFields;
 		}
-		return entity;
+
+		return askedFields;
+	}
+
+	/**
+	 * Update an entity by ID
+	 *
+	 * @param {any} id
+	 * @param {Object} update
+	 * @returns {Promise}
+	 * @memberof MemoryDbAdapter
+	 */
+	async updateById(id: any, update: any): Promise<any> {
+		return await this['update']({ id: id }, update);
 	}
 }
