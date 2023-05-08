@@ -106,13 +106,11 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	}
 
 	/**
-	 * Initialize adapter
-	 * It will be called in `broker.start()` and is used internally
-	 *
+	 * Initialize adapter.
+	 * It will be called in `broker.start()` and is used internally.
 	 * @methods
 	 * @param {ServiceBroker} broker
 	 * @param {Service} service
-	 *
 	 * @memberof TypeORMDbAdapter
 	 */
 	init(broker: ServiceBroker, service: Service) {
@@ -141,12 +139,9 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	/**
 	 * Connects to database.
 	 * It will be called in `broker.start()` and is used internally.
-	 *
 	 * @methods
 	 * @public
-	 *
 	 * @returns {Promise}
-	 *
 	 */
 	async connect(): Promise<any> {
 		/**
@@ -319,11 +314,10 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	/**
 	 * Disconnects all connections from database and connection manager.
 	 * It will be called in `broker.stop()` and is used internally.
-	 *
 	 * @methods
 	 * @public
-	 *
 	 * @returns {Promise}
+	 * @memberof TypeORMDbAdapter
 	 */
 	disconnect(): Promise<any> {
 		this.connectionManager!.connections.forEach(async (connection: DataSource) => {
@@ -359,11 +353,11 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 * Uses this.entity which could be an entity or an array of entities.
 	 * If this._entity is an array, uses first entity in array for active record.
 	 * Used internally by this.adapter for base conection.
-	 *
 	 * @methods
 	 * @private
 	 * @param {T} this
 	 * @returns {Repository<Entity>}
+	 * @memberof TypeORMDbAdapter
 	 *
 	 */
 	getRepository<T extends this>(this: T): Repository<Entity> {
@@ -374,13 +368,12 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 
 	/**
 	 * Gets item by id. Can use find options
-	 *
 	 * @methods
 	 * @param {Partial<T>} key - primary column name
 	 * @param {string | number} id - id of entity
 	 * @param {Object} findOptions - find options, like relations, order, etc. No where clause
 	 * @returns {Promise<T | undefined>}
-	 *
+	 * @memberof TypeORMDbAdapter
 	 */
 	async findByIdWO<T extends Entity>(
 		key: string,
@@ -392,11 +385,11 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 
 	/**
 	 * Gets item by id. No find options
-	 *
 	 * @methods
 	 * @param {Partial<T>} key - primary column name
 	 * @param {string | number} id - id of entity
 	 * @returns {Promise<T | undefined>}
+	 * @memberof TypeORMDbAdapter
 	 *
 	 */
 	async findById<T extends Entity>(key: string, id: string | number): Promise<T | undefined> {
@@ -405,11 +398,11 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 
 	/**
 	 * Gets items by id.
-	 *
 	 * @methods
 	 * @param {Partial<T>} key - primary column name
 	 * @param {Array<string> | Array<number>} ids - ids of entity
 	 * @returns {Promise<T | undefined>}
+	 * @memberof TypeORMDbAdapter
 	 *
 	 */
 	async findByIds<T extends Entity>(key: string, ids: any[]): Promise<T | undefined> {
@@ -418,13 +411,12 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 
 	/**
 	 * List entities by filters and pagination results.
-	 *
 	 * @methods
-	 *
 	 * @param {Context} ctx - Context instance.
 	 * @param {Object?} params - Parameters.
 	 *
 	 * @returns {Object} List of found entities and count.
+	 * @memberof TypeORMDbAdapter
 	 */
 	list(ctx: any, params: any): object {
 		let countParams = Object.assign({}, params);
@@ -461,10 +453,12 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 
 	/**
 	 * Transforms NeDB's '_id' into user defined 'idField'
+	 * @methods
 	 * @param {Object} entity
 	 * @param {String} idField
 	 * @memberof MemoryDbAdapter
 	 * @returns {Object} Modified entity
+	 * @memberof TypeORMDbAdapter
 	 */
 	afterRetrieveTransformID(entity: any, idField: string): object {
 		if (idField !== '_id') {
@@ -476,10 +470,10 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 
 	/**
 	 * Encode ID of entity.
-	 *
 	 * @methods
 	 * @param {any} id
 	 * @returns {any}
+	 * @memberof TypeORMDbAdapter
 	 */
 	encodeID(id: any): any {
 		return id;
@@ -487,10 +481,10 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 
 	/**
 	 * Decode ID of entity.
-	 *
 	 * @methods
 	 * @param {any} id
 	 * @returns {any}
+	 * @memberof TypeORMDbAdapter
 	 */
 	decodeID(id: any): any {
 		return id;
@@ -503,6 +497,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 * @param {Object} 	params
 	 * @param {Array|Object} docs
 	 * @returns {Array|Object}
+	 * @memberof TypeORMDbAdapter
 	 */
 	transformDocuments(ctx: any, params: any, docs: any): Promise<Array<any> | object> {
 		let isDoc = false;
@@ -585,12 +580,12 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 
 	/**
 	 * Call before entity lifecycle events
-	 *
 	 * @methods
 	 * @param {String} type
 	 * @param {Object} entity
 	 * @param {Context} ctx
 	 * @returns {Promise}
+	 * @memberof TypeORMDbAdapter
 	 */
 	beforeEntityChange(type: string | undefined, entity: any, ctx: any): Promise<any> {
 		const eventName = `beforeEntity${capitalize(type)}`;
@@ -602,12 +597,12 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 
 	/**
 	 * Clear the cache & call entity lifecycle events
-	 *
 	 * @methods
 	 * @param {String} type
 	 * @param {Object|Array<Object>|Number} json
 	 * @param {Context} ctx
 	 * @returns {Promise}
+	 * @memberof TypeORMDbAdapter
 	 */
 	async entityChanged(type: string | undefined, json: any, ctx: any): Promise<any> {
 		return await this.clearCache().then(async () => {
@@ -620,9 +615,9 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 
 	/**
 	 * Clear cached entities
-	 *
 	 * @methods
 	 * @returns {Promise}
+	 * @memberof TypeORMDbAdapter
 	 */
 	clearCache(): Promise<any> {
 		this.broker[this.settings.cacheCleanEventType](`cache.clean.${this.fullName}`);
@@ -632,10 +627,11 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 
 	/**
 	 * Filter fields in the entity object
-	 *
+	 * @methods
 	 * @param {Object} 	doc
 	 * @param {Array<String>} 	fields	Filter properties of model.
 	 * @returns	{Object}
+	 * @memberof TypeORMDbAdapter
 	 */
 	filterFields(doc: any, fields: any[]): object {
 		// Apply field filter (support nested paths)
@@ -653,10 +649,11 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 
 	/**
 	 * Exclude fields in the entity object
-	 *
+	 * @methods
 	 * @param {Object} 	doc
 	 * @param {Array<String>} 	fields	Exclude properties of model.
 	 * @returns	{Object}
+	 * @memberof TypeORMDbAdapter
 	 */
 	excludeFields(doc: any, fields: string | any[]): object {
 		if (Array.isArray(fields) && fields.length > 0) {
@@ -679,11 +676,12 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 
 	/**
 	 * Populate documents.
-	 *
+	 * @methods
 	 * @param {Context} 		ctx
 	 * @param {Array|Object} 	docs
 	 * @param {Array?}			populateFields
 	 * @returns	{Promise}
+	 * @memberof TypeORMDbAdapter
 	 */
 	populateDocs(ctx: any, docs: any, populateFields?: any[]): Promise<any> {
 		if (
@@ -792,6 +790,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 * @methods
 	 * @param {Object} entity
 	 * @returns {Promise}
+	 * @memberof TypeORMDbAdapter
 	 */
 	validateEntity(entity: any): Promise<any> {
 		if (!isFunction(this.settings.entityValidator)) return resolve(entity);
@@ -804,10 +803,10 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 
 	/**
 	 * Convert DB entity to JSON object
-	 *
+	 * @methods
 	 * @param {any} entity
 	 * @returns {Object}
-	 * @memberof MemoryDbAdapter
+	 * @memberof TypeORMDbAdapter
 	 */
 	entityToObject(entity: any): object {
 		return entity;
@@ -815,10 +814,12 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 
 	/**
 	 * Transforms 'idField' into NeDB's '_id'
+	 * @methods
 	 * @param {Object} entity
 	 * @param {String} idField
 	 * @memberof MemoryDbAdapter
 	 * @returns {Object} Modified entity
+	 * @memberof TypeORMDbAdapter
 	 */
 	beforeSaveTransformID(entity: any, idField: string): object {
 		let newEntity = cloneDeep(entity);
@@ -833,9 +834,10 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 
 	/**
 	 * Authorize the required field list. Remove fields which is not exist in the `this.settings.fields`
-	 *
+	 * @methods
 	 * @param {Array} askedFields
 	 * @returns {Array}
+	 * @memberof TypeORMDbAdapter
 	 */
 	authorizeFields(askedFields: any[]): Array<any> {
 		if (this.settings.fields && this.settings.fields.length > 0) {
@@ -875,11 +877,11 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 
 	/**
 	 * Update an entity by ID
-	 *
+	 * @methods
 	 * @param {any} id
 	 * @param {Object} update
 	 * @returns {Promise}
-	 * @memberof MemoryDbAdapter
+	 * @memberof TypeORMDbAdapter
 	 */
 	async updateById(id: any, update: any): Promise<any> {
 		return await this['update']({ id: id }, update);
