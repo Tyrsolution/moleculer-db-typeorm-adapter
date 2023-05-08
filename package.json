@@ -44,12 +44,13 @@
 		"@types/bluebird": "^3.5.38",
 		"@types/flat": "^5.0.2",
 		"@types/jest": "^29.5.1",
+		"@types/node": "^20.1.0",
 		"benchmarkify": "^3.0.0",
 		"better-sqlite3": "^8.3.0",
 		"coveralls": "^3.1.1",
 		"dts-bundle-generator": "^8.0.1",
 		"esbuild": "^0.17.18",
-		"eslint": "^8.39.0",
+		"eslint": "^8.40.0",
 		"eslint-config-prettier": "^8.8.0",
 		"eslint-plugin-node": "^11.1.0",
 		"eslint-plugin-prettier": "^4.2.1",
@@ -70,19 +71,26 @@
 		"npm-run-all": "^4.1.5",
 		"prettier": "^2.8.8",
 		"rimraf": "^5.0.0",
-		"rollup": "^3.21.0",
+		"rollup": "^3.21.5",
 		"rollup-plugin-auto-external": "^2.0.0",
 		"rollup-plugin-dts-bundle": "^1.0.0",
 		"rollup-plugin-esbuild": "^5.0.0",
 		"rollup-plugin-node-builtins": "^2.1.2",
 		"ts-jest": "^29.1.0",
+		"tsconfig-paths": "^4.2.0",
 		"typescript": "^5.0.4"
 	},
 	"jest": {
 		"coverageDirectory": "<rootDir>/coverage",
 		"testEnvironment": "node",
 		"collectCoverage": false,
-		"rootDir": "./test",
+		"coveragePathIgnorePatterns": [
+			"<rootDir>/docgen"
+		],
+		"reporters": [
+			"default",
+			"jest-junit"
+		],
 		"transform": {
 			"^.+\\.(ts|tsx)$": [
 				"ts-jest",
@@ -91,7 +99,6 @@
 				}
 			]
 		},
-		"testRegex": ".*\\.(test|spec).(ts|js)$",
 		"setupFiles": [],
 		"setupFilesAfterEnv": [
 			"jest-chain",
@@ -107,7 +114,7 @@
 		]
 	},
 	"engines": {
-		"node": ">= 10.x.x"
+		"node": ">= 16.x.x"
 	},
 	"dependencies": {
 		"bluebird": "^3.7.2",

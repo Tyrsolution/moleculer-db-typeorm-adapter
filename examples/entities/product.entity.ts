@@ -1,7 +1,6 @@
 import { BaseEntity, Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
-
 @Entity()
-export class TypeProduct2 extends BaseEntity {
+export class TypeProduct extends BaseEntity {
 	@PrimaryGeneratedColumn()
 	id: number | undefined;
 
@@ -17,7 +16,7 @@ export class TypeProduct2 extends BaseEntity {
 	@Column()
 	active!: boolean;
 
-	static findByName2(productName: string) {
+	static findByName(productName: string) {
 		return this.createQueryBuilder('type_product')
 			.where('type_product.name = :productName', { productName })
 			.getMany();
