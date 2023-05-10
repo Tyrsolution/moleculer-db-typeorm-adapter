@@ -1,3 +1,8 @@
+/*
+ * moleculer-db-typeorm-adapter
+ * Copyright (c) 2023 TyrSolutions (https://github.com/Tyrsolution/moleculer-db-typeorm-adapter)
+ * MIT Licensed
+ */
 import { isArray } from 'lodash';
 import {
 	DataSource,

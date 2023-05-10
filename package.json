@@ -42,6 +42,7 @@
 		"@rollup/plugin-node-resolve": "^15.0.2",
 		"@rollup/plugin-typescript": "^11.1.0",
 		"@types/bluebird": "^3.5.38",
+		"@types/core-js": "^2.5.5",
 		"@types/flat": "^5.0.2",
 		"@types/jest": "^29.5.1",
 		"@types/node": "^20.1.0",
@@ -120,6 +121,7 @@
 		"bluebird": "^3.7.2",
 		"lodash": "^4.17.21",
 		"tslib": "^2.5.0",
+		"typeof-items": "^1.0.1",
 		"typeorm": "^0.3.15"
 	},
 	"publishConfig": {

@@ -1,3 +1,8 @@
+/*
+ * moleculer-db-typeorm-adapter
+ * Copyright (c) 2023 TyrSolutions (https://github.com/Tyrsolution/moleculer-db-typeorm-adapter)
+ * MIT Licensed
+ */
 import { Service, ServiceBroker } from 'moleculer';
 import {
 	DataSource,
@@ -436,8 +441,8 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	 *
 	 */
 	findByIdWO<T extends Entity>(
-		key: string,
-		id: string | number,
+		key?: string,
+		id?: string | number,
 		findOptions?: FindOneOptions<T>,
 	): Promise<T | undefined>;
 
@@ -1058,8 +1063,8 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	 *
 	 */
 	findByIdWO<T extends Entity>(
-		key: string,
-		id: string | number,
+		key?: string,
+		id?: string | number,
 		findOptions?: FindOneOptions<T>,
 	): Promise<T | undefined>;
 

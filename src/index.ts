@@ -1,6 +1,6 @@
 /*
  * moleculer-db-typeorm-adapter
- * Copyright (c) 2023 TyrSoluitons (https://github.com/Matthew Marino/moleculerModule)
+ * Copyright (c) 2023 TyrSolutions (https://github.com/Tyrsolution/moleculer-db-typeorm-adapter)
  * MIT Licensed
  */
 

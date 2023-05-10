@@ -1,6 +1,6 @@
 /*
- * moleculer-db
- * Copyright (c) 2019 MoleculerJS (https://github.com/moleculerjs/moleculer-db)
+ * moleculer-db-typeorm-adapter
+ * Copyright (c) 2023 TyrSolutions (https://github.com/Tyrsolution/moleculer-db-typeorm-adapter)
  * MIT Licensed
  */
 
@@ -10,6 +10,7 @@ import {
 	capitalize,
 	cloneDeep,
 	compact,
+	find,
 	flattenDeep,
 	get,
 	has,
@@ -18,6 +19,8 @@ import {
 	isObject,
 	isString,
 	isUndefined,
+	mapKeys,
+	replace,
 	set,
 	uniq,
 	unset,
@@ -35,6 +38,7 @@ import {
 	In,
 } from 'typeorm';
 import ConnectionManager from './connectionManager';
+const type = require('typeof-items');
 
 /**
  * Moleculer TypeORM Adapter
@@ -376,11 +380,17 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 * @memberof TypeORMDbAdapter
 	 */
 	async findByIdWO<T extends Entity>(
-		key: string,
+		key: string = find(this.repository!.metadata.ownColumns, { isPrimary: true })!.propertyName,
 		id: string | number,
 		findOptions?: FindOneOptions<T>,
 	): Promise<T | undefined> {
-		return await this['findOne']({ where: { [key]: In([id]) }, ...findOptions });
+		const entity = await this['findOneOrFail']({
+			where: { [key]: In([id]) },
+			...findOptions,
+		});
+		return this.afterRetrieveTransformID(entity, this.service.settings.idField) as
+			| T
+			| undefined;
 	}
 
 	/**
@@ -392,8 +402,14 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 * @memberof TypeORMDbAdapter
 	 *
 	 */
-	async findById<T extends Entity>(key: string, id: string | number): Promise<T | undefined> {
-		return await this['findOneBy']({ [key]: In([id]) });
+	async findById<T extends Entity>(
+		key: string = find(this.repository!.metadata.ownColumns, { isPrimary: true })!.propertyName,
+		id: string | number,
+	): Promise<T | undefined> {
+		const entity = await this['findOneByOrFail']({ [key]: In([id]) });
+		return this.afterRetrieveTransformID(entity, this.service.settings.idField) as
+			| T
+			| undefined;
 	}
 
 	/**
@@ -405,8 +421,14 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 * @memberof TypeORMDbAdapter
 	 *
 	 */
-	async findByIds<T extends Entity>(key: string, ids: any[]): Promise<T | undefined> {
-		return await this['findBy']({ [key]: In([...ids]) });
+	async findByIds<T extends Entity>(
+		key: string = find(this.repository!.metadata.ownColumns, { isPrimary: true })!.propertyName,
+		ids: any[],
+	): Promise<T | undefined> {
+		const entity = await this['findBy']({ [key]: In([...ids]) });
+		return this.afterRetrieveTransformID(entity, this.service.settings.idField) as
+			| T
+			| undefined;
 	}
 
 	/**
@@ -424,15 +446,71 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 		if (countParams && countParams.limit) countParams.limit = null;
 		if (countParams && countParams.offset) countParams.offset = null;
 		if (params.limit == null) {
-			if (this.settings.limit > 0 && params.pageSize > this.settings.limit)
-				params.limit = this.settings.limit;
+			if (this.service.settings.limit > 0 && params.pageSize > this.service.settings.limit)
+				params.limit = this.service.settings.limit;
 			else params.limit = params.pageSize;
 		}
+		let modifiedFindParams;
+		if (params.take && params.skip) {
+			if (params.limit) {
+				delete params.limit;
+			}
+			if (params.offset) {
+				delete params.offset;
+			}
+			modifiedFindParams = params;
+		} else if (params.limit || params.offset) {
+			modifiedFindParams = JSON.parse(
+				replace(JSON.stringify(params), '"limit":', '"take":').replace(
+					'"offset":',
+					'"skip":',
+				),
+			);
+		}
+		if (modifiedFindParams.relations && typeof modifiedFindParams.relations === 'string') {
+			modifiedFindParams.relations = JSON.parse(modifiedFindParams.relations);
+		}
+		if (modifiedFindParams.where && typeof modifiedFindParams.where === 'string') {
+			modifiedFindParams.where = JSON.parse(modifiedFindParams.where);
+		}
+		let modifiedCountParams;
+		if (countParams.take && countParams.skip) {
+			if (countParams.limit) {
+				delete countParams.limit;
+			}
+			if (countParams.offset) {
+				delete countParams.offset;
+			}
+			modifiedCountParams = countParams;
+		}
+		if (params.limit || params.offset) {
+			modifiedCountParams = JSON.parse(
+				replace(JSON.stringify(countParams), '"limit":', '"take":').replace(
+					'"offset":',
+					'"skip":',
+				),
+			);
+		}
+		if (modifiedCountParams.relations && typeof modifiedCountParams.relations === 'string') {
+			delete modifiedCountParams.relations;
+		}
+		if (modifiedCountParams.where && typeof modifiedCountParams.where === 'string') {
+			modifiedCountParams.where = JSON.parse(modifiedCountParams.where);
+		}
+		delete modifiedFindParams.pageSize;
+		delete modifiedFindParams.page;
+		delete modifiedCountParams.pageSize;
+		delete modifiedCountParams.page;
+
+		console.log('list params: ', modifiedFindParams);
+		console.log('count params: ', countParams);
+		console.log('params: ', params);
+		console.log('modified modifiedCountParams: ', modifiedCountParams);
 		return all([
 			// Get rows
-			this.adapter.find(params),
+			this.find(modifiedFindParams),
 			// Get count of all rows
-			this.adapter.count(countParams),
+			this.count(modifiedCountParams),
 		]).then(async (res) => {
 			return await this.transformDocuments(ctx, params, res[0]).then((docs: any) => {
 				return {
@@ -452,6 +530,35 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	}
 
 	/**
+	 * Transforms 'idField' into NeDB's '_id'
+	 * @methods
+	 * @param {Object} entity
+	 * @param {String} idField
+	 * @memberof MemoryDbAdapter
+	 * @returns {Object} Modified entity
+	 * @memberof TypeORMDbAdapter
+	 */
+	beforeSaveTransformID(entity: any, idField: string): object {
+		let newEntity = cloneDeep(entity);
+		// gets the idField from the entity
+		const dbIDField = find(this.repository!.metadata.ownColumns, {
+			isPrimary: true,
+		})!.propertyName;
+
+		if (idField !== dbIDField && entity[idField] !== undefined) {
+			newEntity = JSON.parse(
+				replace(
+					JSON.stringify(newEntity),
+					new RegExp(`"${idField}":`, 'g'),
+					`"${dbIDField}":`,
+				),
+			);
+		}
+
+		return newEntity;
+	}
+
+	/**
 	 * Transforms NeDB's '_id' into user defined 'idField'
 	 * @methods
 	 * @param {Object} entity
@@ -460,12 +567,22 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 * @returns {Object} Modified entity
 	 * @memberof TypeORMDbAdapter
 	 */
-	afterRetrieveTransformID(entity: any, idField: string): object {
-		if (idField !== '_id') {
-			entity[idField] = entity['_id'];
-			delete entity._id;
+	afterRetrieveTransformID(entity: any, idField: string): Object {
+		// gets the idField from the entity
+		const dbIDField = find(this.repository!.metadata.ownColumns, {
+			isPrimary: true,
+		})!.propertyName;
+		let newEntity;
+		if (!entity.hasOwnProperty(idField)) {
+			newEntity = JSON.parse(
+				replace(
+					JSON.stringify(entity),
+					new RegExp(`"${dbIDField}":`, 'g'),
+					`"${idField}":`,
+				),
+			);
 		}
-		return entity;
+		return newEntity;
 	}
 
 	/**
@@ -511,18 +628,20 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 		return (
 			resolve(docs)
 				// Convert entity to JS object
-				.then((docs) => docs.map((doc: any) => this.adapter.entityToObject(doc)))
+				.then((docs) => docs.map((doc: any) => this.entityToObject(doc)))
 
 				// Apply idField
 				.then((docs) =>
 					docs.map((doc: any) =>
-						this.adapter.afterRetrieveTransformID(doc, this.settings.idField),
+						this.afterRetrieveTransformID(doc, this.service.settings.idField),
 					),
 				)
 				// Encode IDs
 				.then((docs) =>
 					docs.map((doc: { [x: string]: any }) => {
-						doc[this.settings.idField] = this.encodeID(doc[this.settings.idField]);
+						doc[this.service.settings.idField] = this.encodeID(
+							doc[this.service.settings.idField],
+						);
 						return doc;
 					}),
 				)
@@ -547,7 +666,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 						return json.map((item: any) => this.filterFields(item, authFields));
 					} else {
 						return json.map((item: any) =>
-							this.filterFields(item, this.settings.fields),
+							this.filterFields(item, this.service.settings.fields),
 						);
 					}
 				})
@@ -561,7 +680,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 								: params.excludeFields
 							: [];
 					const excludeFields = askedExcludeFields.concat(
-						this.settings.excludeFields || [],
+						this.service.settings.excludeFields || [],
 					);
 
 					if (Array.isArray(excludeFields) && excludeFields.length > 0) {
@@ -575,6 +694,16 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 
 				// Return
 				.then((json) => (isDoc ? json[0] : json))
+				.catch((err) => {
+					/* istanbul ignore next */
+					this.broker.logger.error('Transforming documents is failed!', err);
+					throw new Errors.MoleculerServerError(
+						`Failed to transform documents ${err}`,
+						500,
+						'FAILED_TO_TRANSFORM_DOCUMENTS',
+						err,
+					);
+				})
 		);
 	}
 
@@ -589,10 +718,10 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 */
 	beforeEntityChange(type: string | undefined, entity: any, ctx: any): Promise<any> {
 		const eventName = `beforeEntity${capitalize(type)}`;
-		if (this.schema[eventName] == null) {
+		if (this.service.schema[eventName] == null) {
 			return resolve(entity);
 		}
-		return resolve(this.schema[eventName].call(this, entity, ctx));
+		return resolve(this.service.schema[eventName].call(this, entity, ctx));
 	}
 
 	/**
@@ -608,7 +737,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 		return await this.clearCache().then(async () => {
 			const eventName = `entity${capitalize(type)}`;
 			if (this.schema[eventName] != null) {
-				return await this.schema[eventName].call(this, json, ctx);
+				return await this.service.schema[eventName].call(this, json, ctx);
 			}
 		});
 	}
@@ -620,7 +749,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 * @memberof TypeORMDbAdapter
 	 */
 	clearCache(): Promise<any> {
-		this.broker[this.settings.cacheCleanEventType](`cache.clean.${this.fullName}`);
+		this.broker[this.service.settings.cacheCleanEventType](`cache.clean.${this.fullName}`);
 		if (this.broker.cacher) return this.broker.cacher.clean(`${this.fullName}.**`);
 		return resolve();
 	}
@@ -685,7 +814,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 */
 	populateDocs(ctx: any, docs: any, populateFields?: any[]): Promise<any> {
 		if (
-			!this.settings.populates ||
+			!this.service.settings.populates ||
 			!Array.isArray(populateFields) ||
 			populateFields.length == 0
 		)
@@ -693,7 +822,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 
 		if (docs == null || (!isObject(docs) && !Array.isArray(docs))) return resolve(docs);
 
-		const settingPopulateFields = Object.keys(this.settings.populates);
+		const settingPopulateFields = Object.keys(this.service.settings.populates);
 
 		/* Group populateFields by populatesFields for deep population.
 			(e.g. if "post" in populates and populateFields = ["post.author", "post.reviewer", "otherField"])
@@ -717,7 +846,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 
 		let promises = [];
 		for (const populatesField of settingPopulateFields) {
-			let rule = this.settings.populates[populatesField];
+			let rule = this.service.settings.populates[populatesField];
 			if (groupedPopulateFields[populatesField] == null) continue; // skip
 
 			// if the rule is a function, save as a custom handler
@@ -793,12 +922,12 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 * @memberof TypeORMDbAdapter
 	 */
 	validateEntity(entity: any): Promise<any> {
-		if (!isFunction(this.settings.entityValidator)) return resolve(entity);
+		if (!isFunction(this.service.settings.entityValidator)) return resolve(entity);
 
 		let entities = Array.isArray(entity) ? entity : [entity];
-		return all(entities.map((entity) => this.settings.entityValidator.call(this, entity))).then(
-			() => entity,
-		);
+		return all(
+			entities.map((entity) => this.service.settings.entityValidator.call(this, entity)),
+		).then(() => entity);
 	}
 
 	/**
@@ -813,38 +942,18 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	}
 
 	/**
-	 * Transforms 'idField' into NeDB's '_id'
-	 * @methods
-	 * @param {Object} entity
-	 * @param {String} idField
-	 * @memberof MemoryDbAdapter
-	 * @returns {Object} Modified entity
-	 * @memberof TypeORMDbAdapter
-	 */
-	beforeSaveTransformID(entity: any, idField: string): object {
-		let newEntity = cloneDeep(entity);
-
-		if (idField !== '_id' && entity[idField] !== undefined) {
-			newEntity._id = newEntity[idField];
-			delete newEntity[idField];
-		}
-
-		return newEntity;
-	}
-
-	/**
-	 * Authorize the required field list. Remove fields which is not exist in the `this.settings.fields`
+	 * Authorize the required field list. Remove fields which is not exist in the `this.service.settings.fields`
 	 * @methods
 	 * @param {Array} askedFields
 	 * @returns {Array}
 	 * @memberof TypeORMDbAdapter
 	 */
 	authorizeFields(askedFields: any[]): Array<any> {
-		if (this.settings.fields && this.settings.fields.length > 0) {
+		if (this.service.settings.fields && this.service.settings.fields.length > 0) {
 			let allowedFields: any[] = [];
 			if (Array.isArray(askedFields) && askedFields.length > 0) {
 				askedFields.forEach((askedField) => {
-					if (this.settings.fields.indexOf(askedField) !== -1) {
+					if (this.service.settings.fields.indexOf(askedField) !== -1) {
 						allowedFields.push(askedField);
 						return;
 					}
@@ -853,21 +962,21 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 						let parts = askedField.split('.');
 						while (parts.length > 1) {
 							parts.pop();
-							if (this.settings.fields.indexOf(parts.join('.')) !== -1) {
+							if (this.service.settings.fields.indexOf(parts.join('.')) !== -1) {
 								allowedFields.push(askedField);
 								return;
 							}
 						}
 					}
 
-					let nestedFields = this.settings.fields.filter((settingField: string) =>
+					let nestedFields = this.service.settings.fields.filter((settingField: string) =>
 						settingField.startsWith(askedField + '.'),
 					);
 					if (nestedFields.length > 0) {
 						allowedFields = allowedFields.concat(nestedFields);
 					}
 				});
-				//return _.intersection(f, this.settings.fields);
+				//return _.intersection(f, this.service.settings.fields);
 			}
 			return allowedFields;
 		}
@@ -884,6 +993,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 * @memberof TypeORMDbAdapter
 	 */
 	async updateById(id: any, update: any): Promise<any> {
-		return await this['update']({ id: id }, update);
+		const entity = await this['update']({ id: id }, update);
+		return this.afterRetrieveTransformID(entity, this.service.settings.idField);
 	}
 }
