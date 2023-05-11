@@ -292,8 +292,11 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 						validateEntity: this.validateEntity,
 						entityToObject: this.entityToObject,
 						beforeSaveTransformID: this.beforeSaveTransformID,
+						beforeQueryTransformID: this.beforeQueryTransformID,
 						authorizeFields: this.authorizeFields,
 						updateById: this.updateById,
+						broker: this.broker,
+						service: this.service,
 				  })
 				: null;
 		});
@@ -380,12 +383,13 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 * @memberof TypeORMDbAdapter
 	 */
 	async findByIdWO<T extends Entity>(
-		key: string = find(this.repository!.metadata.ownColumns, { isPrimary: true })!.propertyName,
+		key: string | undefined | null = this.service.settings.idField,
 		id: string | number,
 		findOptions?: FindOneOptions<T>,
 	): Promise<T | undefined> {
+		const dbID = this.beforeQueryTransformID(key);
 		const entity = await this['findOneOrFail']({
-			where: { [key]: In([id]) },
+			where: { [dbID]: In([id]) },
 			...findOptions,
 		});
 		return this.afterRetrieveTransformID(entity, this.service.settings.idField) as
@@ -403,10 +407,11 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 *
 	 */
 	async findById<T extends Entity>(
-		key: string = find(this.repository!.metadata.ownColumns, { isPrimary: true })!.propertyName,
+		key: string | undefined | null = this.service.settings.idField,
 		id: string | number,
 	): Promise<T | undefined> {
-		const entity = await this['findOneByOrFail']({ [key]: In([id]) });
+		const dbID = this.beforeQueryTransformID(key);
+		const entity = await this['findOneByOrFail']({ [dbID]: In([id]) });
 		return this.afterRetrieveTransformID(entity, this.service.settings.idField) as
 			| T
 			| undefined;
@@ -422,10 +427,11 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 *
 	 */
 	async findByIds<T extends Entity>(
-		key: string = find(this.repository!.metadata.ownColumns, { isPrimary: true })!.propertyName,
+		key: string | undefined | null = this.service.settings.idField,
 		ids: any[],
 	): Promise<T | undefined> {
-		const entity = await this['findBy']({ [key]: In([...ids]) });
+		const dbID = this.beforeQueryTransformID(key);
+		const entity = await this['findBy']({ [dbID]: In([...ids]) });
 		return this.afterRetrieveTransformID(entity, this.service.settings.idField) as
 			| T
 			| undefined;
@@ -435,7 +441,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 * List entities by filters and pagination results.
 	 * @methods
 	 * @param {Context} ctx - Context instance.
-	 * @param {Object?} params - Parameters.
+	 * @param {FindManyOptions<Object>?} params - Optional parameters.
 	 *
 	 * @returns {Object} List of found entities and count.
 	 * @memberof TypeORMDbAdapter
@@ -530,7 +536,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	}
 
 	/**
-	 * Transforms 'idField' into NeDB's '_id'
+	 * Transforms 'idField' into expected db id field.
 	 * @methods
 	 * @param {Object} entity
 	 * @param {String} idField
@@ -559,7 +565,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	}
 
 	/**
-	 * Transforms NeDB's '_id' into user defined 'idField'
+	 * Transforms db field into user defined 'idField'
 	 * @methods
 	 * @param {Object} entity
 	 * @param {String} idField
@@ -594,6 +600,23 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 */
 	encodeID(id: any): any {
 		return id;
+	}
+
+	/**
+	 * Transform idField into the name of the id field in db
+	 * @methods
+	 * @param {any} idField
+	 * @returns {any}
+	 * @memberof TypeORMDbAdapter
+	 */
+	beforeQueryTransformID(idField: any): any {
+		const dbIDField = find(this.repository!.metadata.ownColumns, {
+			isPrimary: true,
+		})!.propertyName;
+		if (idField !== dbIDField) {
+			return dbIDField;
+		}
+		return idField;
 	}
 
 	/**
@@ -995,5 +1018,57 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	async updateById(id: any, update: any): Promise<any> {
 		const entity = await this['update']({ id: id }, update);
 		return this.afterRetrieveTransformID(entity, this.service.settings.idField);
+	}
+
+	/**
+	 * Sanitize context parameters at `find` action.
+	 *
+	 * @methods
+	 *
+	 * @param {Context} ctx
+	 * @param {Object} params
+	 * @returns {Object}
+	 */
+	sanitizeParams(ctx: any, params: any) {
+		let p = Object.assign({}, params);
+
+		// Convert from string to number
+		if (typeof p.limit === 'string') p.limit = Number(p.limit);
+		if (typeof p.offset === 'string') p.offset = Number(p.offset);
+		if (typeof p.page === 'string') p.page = Number(p.page);
+		if (typeof p.pageSize === 'string') p.pageSize = Number(p.pageSize);
+		// Convert from string to POJO
+		if (typeof p.query === 'string') p.query = JSON.parse(p.query);
+
+		if (typeof p.sort === 'string') p.sort = p.sort.split(/[,\s]+/);
+
+		if (typeof p.fields === 'string') p.fields = p.fields.split(/[,\s]+/);
+
+		if (typeof p.excludeFields === 'string') p.excludeFields = p.excludeFields.split(/[,\s]+/);
+
+		if (typeof p.populate === 'string') p.populate = p.populate.split(/[,\s]+/);
+
+		if (typeof p.searchFields === 'string') p.searchFields = p.searchFields.split(/[,\s]+/);
+
+		if (ctx.action.name.endsWith('.list')) {
+			// Default `pageSize`
+			if (!p.pageSize) p.pageSize = this.settings.pageSize;
+
+			// Default `page`
+			if (!p.page) p.page = 1;
+
+			// Limit the `pageSize`
+			if (this.settings.maxPageSize > 0 && p.pageSize > this.settings.maxPageSize)
+				p.pageSize = this.settings.maxPageSize;
+
+			// Calculate the limit & offset from page & pageSize
+			p.limit = p.pageSize;
+			p.offset = (p.page - 1) * p.pageSize;
+		}
+		// Limit the `limit`
+		if (this.settings.maxLimit > 0 && p.limit > this.settings.maxLimit)
+			p.limit = this.settings.maxLimit;
+
+		return p;
 	}
 }

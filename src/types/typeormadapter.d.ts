@@ -431,6 +431,14 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	clear<T extends Entity>(this: { new (): T }): Promise<void>;
 	/** additional custom methods */
 	/**
+	 * Transform the id key to the name of the id field in db
+	 * @methods
+	 * @param {any} idField
+	 * @returns {any}
+	 * @memberof TypeORMDbAdapter
+	 */
+	beforeQueryTransformID(idField: any): any;
+	/**
 	 * Gets item by id. Can use find options
 	 *
 	 * @methods
@@ -441,8 +449,8 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	 *
 	 */
 	findByIdWO<T extends Entity>(
-		key?: string,
-		id?: string | number,
+		key: string | undefined | null,
+		id: string | number,
 		findOptions?: FindOneOptions<T>,
 	): Promise<T | undefined>;
 
@@ -455,7 +463,10 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	 * @returns {Promise<T | undefined>}
 	 *
 	 */
-	findById<T extends Entity>(key: string, id: string | number): Promise<T | undefined>;
+	findById<T extends Entity>(
+		key: string | undefined | null,
+		id: string | number,
+	): Promise<T | undefined>;
 	/**
 	 * Gets items by id.
 	 *
@@ -465,7 +476,7 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	 * @returns {Promise<T | undefined>}
 	 *
 	 */
-	findByIds<T extends Entity>(key: string, ids: any[]): Promise<T | undefined>;
+	findByIds<T extends Entity>(key: string | undefined | null, ids: any[]): Promise<T | undefined>;
 	/**
 	 * List entities by filters and pagination results.
 	 *
@@ -1009,7 +1020,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	 * Executes a raw SQL query and returns a raw database results.
 	 * Raw query execution is supported only by relational databases (MongoDB is not supported).
 	 */
-	query<T extends Entity>(query: string, parameters?: any[]): Promise<any>;
+	query<T extends Entity>(query: string, parameters?: any[]): Promise<T>;
 	/**
 	 * Clears all the data from the given table/collection (truncates/drops it).
 	 *
@@ -1053,6 +1064,14 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	afterRetrieveTransformID(entity: Record<string, any>, idField: string): object;
 	/** additional custom methods */
 	/**
+	 * Transform the id key to the name of the id field in db
+	 * @methods
+	 * @param {any} idField
+	 * @returns {any}
+	 * @memberof TypeORMDbAdapter
+	 */
+	beforeQueryTransformID(idField: any): any;
+	/**
 	 * Gets item by id. Can use find options
 	 *
 	 * @methods
@@ -1063,8 +1082,8 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	 *
 	 */
 	findByIdWO<T extends Entity>(
-		key?: string,
-		id?: string | number,
+		key: string | undefined | null,
+		id: string | number,
 		findOptions?: FindOneOptions<T>,
 	): Promise<T | undefined>;
 
@@ -1077,7 +1096,10 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	 * @returns {Promise<T | undefined>}
 	 *
 	 */
-	findById<T extends Entity>(key: string, id: string | number): Promise<T | undefined>;
+	findById<T extends Entity>(
+		key: string | undefined | null,
+		id: string | number,
+	): Promise<T | undefined>;
 	/**
 	 * Gets items by id.
 	 *
@@ -1087,7 +1109,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	 * @returns {Promise<T | undefined>}
 	 *
 	 */
-	findByIds<T extends Entity>(key: string, ids: any[]): Promise<T | undefined>;
+	findByIds<T extends Entity>(key: string | undefined | null, ids: any[]): Promise<T | undefined>;
 	/**
 	 * List entities by filters and pagination results.
 	 *

@@ -15,9 +15,11 @@ A TypeORM adapter for moleculer
 - Connection Manager - manage your existing connections or create new ones to different database systems on the same service.
 - All entities added to TypeORMDbAdapter and model array are added to this.adapter
   - Base entity ```this.adapter```
-  - any aditional entity ```this.adapter.<entity name>```
-- Repository and entityManager surfaced for ```this.adapter``` and additional entities ```this.adapter.<entity name>``` if more advanced TypeORM features are required
-- Database connection starts and stops when service does
+  - any additional entity ```this.adapter.<entity name>``` when model has more than one entity. Note: additional entities added to ```model:``` are tables in the same database.
+- Repository and entityManager surfaced for ```this.adapter``` and additional entities on same adapter instance  ```this.adapter.<entity name>``` if more advanced TypeORM features are required
+- Database connections for service start and stop when service does, so closing db connection not necessary.
+- Setting idField in service schema is used to specify own preference and obfusicate the true db id field in teh entire response, includng returned relations. This gets converted to the actual db field name automatically when querying the database, then converted back to idField on response. if you wish to use teh actual db id field of the database, change idField to the database id field name.
+- The service setting ```fields:[]``` filters the response, just like in moleculer-db, so if you do change the idField in settings, be sure to change the id field in service settings ```fields``` as well.
 
 ## Install
 #### NPM

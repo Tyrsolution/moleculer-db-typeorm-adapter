@@ -15,9 +15,11 @@ A TypeORM adapter for moleculer
 - Connection Manager - manage your existing connections or create new ones to different database systems on the same service.
 - All entities added to TypeORMDbAdapter and model array are added to this.adapter
   - Base entity ```this.adapter```
-  - any aditional entity ```this.adapter.<entity name>```
-- Repository and entityManager surfaced for ```this.adapter``` and additional entities ```this.adapter.<entity name>``` if more advanced TypeORM features are required
-- Database connection starts and stops when service does
+  - any additional entity ```this.adapter.<entity name>``` when model has more than one entity. Note: additional entities added to ```model:``` are tables in the same database.
+- Repository and entityManager surfaced for ```this.adapter``` and additional entities on same adapter instance  ```this.adapter.<entity name>``` if more advanced TypeORM features are required
+- Database connections for service start and stop when service does, so closing db connection not necessary.
+- Setting idField in service schema is used to specify own preference and obfusicate the true db id field in teh entire response, includng returned relations. This gets converted to the actual db field name automatically when querying the database, then converted back to idField on response. if you wish to use teh actual db id field of the database, change idField to the database id field name.
+- The service setting ```fields:[]``` filters the response, just like in moleculer-db, so if you do change the idField in settings, be sure to change the id field in service settings ```fields``` as well.
 
 ## Install
 #### NPM
@@ -349,7 +351,7 @@ List entities by filters and pagination results.
 | Property | Type | Default | Description |
 | -------- | ---- | ------- | ----------- |
 | `ctx` | `Context` | **required** | Context instance. |
-| `params` | `Object` | - | Parameters. |
+| `params` | `FindManyOptions.<Object>` | - | Optional parameters. |
 
 ### Results
 **Type:** `Object`
@@ -357,9 +359,25 @@ List entities by filters and pagination results.
 List of found entities and count.
 
 
+## `beforeSaveTransformID` 
+
+Transforms 'idField' into expected db id field.
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `entity` | `Object` | **required** |  |
+| `idField` | `String` | **required** |  |
+
+### Results
+**Type:** `Object`
+
+Modified entity
+
+
 ## `afterRetrieveTransformID` 
 
-Transforms NeDB's '_id' into user defined 'idField'
+Transforms db field into user defined 'idField'
 
 ### Parameters
 | Property | Type | Default | Description |
@@ -381,6 +399,21 @@ Encode ID of entity.
 | Property | Type | Default | Description |
 | -------- | ---- | ------- | ----------- |
 | `id` | `any` | **required** |  |
+
+### Results
+**Type:** `any`
+
+
+
+
+## `beforeQueryTransformID` 
+
+Transform idField into the name of the id field in db
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `idField` | `any` | **required** |  |
 
 ### Results
 **Type:** `any`
@@ -548,25 +581,9 @@ Convert DB entity to JSON object
 
 
 
-## `beforeSaveTransformID` 
-
-Transforms 'idField' into NeDB's '_id'
-
-### Parameters
-| Property | Type | Default | Description |
-| -------- | ---- | ------- | ----------- |
-| `entity` | `Object` | **required** |  |
-| `idField` | `String` | **required** |  |
-
-### Results
-**Type:** `Object`
-
-Modified entity
-
-
 ## `authorizeFields` 
 
-Authorize the required field list. Remove fields which is not exist in the `this.settings.fields`
+Authorize the required field list. Remove fields which is not exist in the `this.service.settings.fields`
 
 ### Parameters
 | Property | Type | Default | Description |
@@ -591,6 +608,22 @@ Update an entity by ID
 
 ### Results
 **Type:** `Promise`
+
+
+
+
+## `sanitizeParams` 
+
+Sanitize context parameters at `find` action.
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `ctx` | `Context` | **required** |  |
+| `params` | `Object` | **required** |  |
+
+### Results
+**Type:** `Object`
 
 
 
