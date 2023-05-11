@@ -122,7 +122,9 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 		this.service = service;
 		const entityFromService = this.service.schema.model;
 		const entityArray: Array<EntitySchema<Entity>> = [];
-		isArray(entityFromService)
+		has(this.opts, 'entities')
+			? (this._entity = [...this.opts.entities])
+			: isArray(entityFromService)
 			? (entityFromService.forEach((entity) => {
 					const isValid = !!entity.constructor;
 					if (!isValid) {
@@ -135,8 +137,6 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 			  (this._entity = entityArray))
 			: !isUndefined(entityFromService) && !!entityFromService.constructor
 			? (this._entity = entityFromService)
-			: has(this.opts, 'entities')
-			? (this._entity = [...this.opts.entities])
 			: new Errors.MoleculerServerError('Invalid model. It should be a typeorm repository');
 	}
 
@@ -155,10 +155,11 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 		/**
 		 * set connection opts
 		 */
-		this.opts = {
+		/* this.opts = {
+
 			...this.opts,
 			entities: isArray(this._entity) ? this._entity : [this._entity],
-		};
+		}; */
 		/**
 		 * create connection using this.opts & initialize db connection
 		 */

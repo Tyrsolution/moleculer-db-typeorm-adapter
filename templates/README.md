@@ -12,15 +12,15 @@ A TypeORM adapter for moleculer
 
 - All supported TypeORM databases
 - Active Record methodology for entities or data mapping methodology if entity class doesn't extend TypeORM BaseEntity built in
-- Connection Manager - manage your existing connections or create new ones to different database systems on the same service.
+- Connection Manager - manage your existing connections or create new ones to different database systems on the same service. New connections are a new instance of ```TypeORMDbAdapter``` if ```true``` is added after datasource options. If ```true``` is not specified, then the connection will be created with raw TypeORM datasource and not inherit class methods, only TypeORM methods will be available (about the same as using typeorm by itself).
 - All entities added to TypeORMDbAdapter and model array are added to this.adapter
   - Base entity ```this.adapter```
   - any additional entity ```this.adapter.<entity name>``` when model has more than one entity. Note: additional entities added to ```model:``` are tables in the same database.
 - Repository and entityManager surfaced for ```this.adapter``` and additional entities on same adapter instance  ```this.adapter.<entity name>``` if more advanced TypeORM features are required
 - Database connections for service start and stop when service does, so closing db connection not necessary.
-- Setting idField in service schema is used to specify own preference and obfusicate the true db id field in teh entire response, includng returned relations. This gets converted to the actual db field name automatically when querying the database, then converted back to idField on response. if you wish to use teh actual db id field of the database, change idField to the database id field name.
+- Setting ```idField``` in service schema is used to specify own preference and obfusicate the true db id field in the entire response, includng returned relations. This gets converted to the actual db field name automatically when querying the database, then converted back to idField on response. If you wish to use the actual db id field of the database, change idField to the database id field name.
 - The service setting ```fields:[]``` filters the response, just like in moleculer-db, so if you do change the idField in settings, be sure to change the id field in service settings ```fields``` as well.
-- Enhanced list method that converts moleculer-db list paramaters to typeorm or use typeorm ```FindManyOptions`` paramaters [FindManyOptions](https://github.com/typeorm/typeorm/blob/d8a2e3730f12bb2b8e521635e176a284594121f3/src/find-options/FindManyOptions.ts). List can return relations, though this could be process intensive depending on the amount of relations and entities returned.
+- Enhanced list method that converts moleculer-db list paramaters to typeorm paramaters or use typeorm ```FindManyOptions``` paramaters instead [FindManyOptions](https://github.com/typeorm/typeorm/blob/d8a2e3730f12bb2b8e521635e176a284594121f3/src/find-options/FindManyOptions.ts). List can return relations, though this could be process intensive depending on the amount of relations and entities returned.
 
 ## Install
 #### NPM
@@ -49,6 +49,34 @@ service: {
 
     model: TypeProduct || [TypeProduct, TypeProduct2], // accepts single entity or array of entities.
     ...
+}
+```
+
+Create a new db connection in service (preferably in service started lifecycle handler):
+```js
+async started() {
+    this.logger.debug('♻ User service created');
+    /**
+     * Creates the new connection using conneciton manager of the existing adapter in service,
+     * adding true after the data source options tells connctionmanager to create a new instance
+     * of TypeORMDbAdapter to the specified database. This in turn allows the new connection to have multiple entities (db tables)
+     * applied that are added to the new connection. In this case below this.products would query the ProductEntity
+     * table of database and this.products.<additional entity> would query that table in teh same db.
+     */
+    const productsConnection = await this.adapter.connectionManager?.create(
+        {
+            name: 'products',
+            type: 'better-sqlite3',
+            database: `temp/dbname_product.db`,
+            synchronize: true,
+            logging: [/* 'query', */ 'error'],
+            entities: [ProductEntity],
+        },
+        true,
+    )!;
+    await productsConnection.init(this.broker, this); // needed to initialize the conection with broker and service
+    await productsConnection.connect(); // connects to the database
+    this.products = productsConnection; // assigns new connection to service and can be called with this.products
 }
 ```
 

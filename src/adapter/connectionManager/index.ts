@@ -11,6 +11,8 @@ import {
 	AlreadyHasActiveConnectionError,
 } from 'typeorm';
 import { Errors } from 'moleculer';
+import TypeORMDbAdapter from '../../adapter';
+import { resolve } from 'bluebird';
 
 /**
  * ConnectionManager is used to store and manage multiple orm connections.
@@ -139,11 +141,12 @@ export default class ConnectionManager {
 	 *
 	 * @public
 	 * @param {Object} options - TypeORM data source connection options
+	 * @param {boolean} newConnection - Toggle to create a new instance of TypeORMDbAdapter.
 	 * @returns {Promise<connection>} - Connection
 	 *
 	 * @connectionmanager
 	 */
-	async create(options: DataSourceOptions): Promise<DataSource> {
+	async create(options: DataSourceOptions, newConnection: boolean = false): Promise<any> {
 		// check if such connection is already registered
 		const existConnection = this.connectionMap.get(options.name || 'default');
 		const throwError = () => {
@@ -154,124 +157,29 @@ export default class ConnectionManager {
 				'ERR_CONNECTION_ALREADY_EXIST',
 			);
 		};
-		/**
-		 * array of entities
-		 */
-		// const entityArrray: any = options.entities;
-		const dbConnection: any =
-			existConnection && existConnection.isInitialized
-				? throwError()
-				: new DataSource(options);
-		const activeConneciton: any = await dbConnection
-			.initialize()
-			.then((dataConnection: any) => dataConnection)
-			.catch((err: any) => {
-				throw new Errors.MoleculerServerError(err.message, 500, 'ERR_CONNECTION_CREATE');
-			});
 
-		// /**
-		//  * get entity methods
-		//  *
-		//  * @param {Object} obj -- entity object
-		//  * @returns {Array<string>}
-		//  */
-		// const entityMethods = (obj: { [key: string]: any } = {}) => {
-		// 	const members = Object.getOwnPropertyNames(obj);
-		// 	const methods = members.filter((el) => {
-		// 		return typeof obj[el] === 'function';
-		// 	});
-		// 	return methods;
-		// };
+		let activeConneciton: any;
+		if (newConnection && !existConnection) {
+			return new TypeORMDbAdapter(options) as TypeORMDbAdapter<any>;
+		} else {
+			const dbConnection: any =
+				existConnection && existConnection.isInitialized
+					? throwError()
+					: new DataSource(options);
+			activeConneciton = await dbConnection
+				.initialize()
+				.then((dataConnection: any) => dataConnection)
+				.catch((err: any) => {
+					throw new Errors.MoleculerServerError(
+						err.message,
+						500,
+						'ERR_CONNECTION_CREATE',
+					);
+				});
 
-		// /**
-		//  * add additional entities and methods to adapter
-		//  * under entity name this.adapter.entityName
-		//  */
-		// entityArrray.forEach((entity: any, index: number) => {
-		// 	const dbRepository = activeConneciton.getRepository(entity);
-		// 	const entityName = dbRepository.metadata.name;
-		// 	const methodNames = entityMethods(entity);
-		// 	/**
-		// 	 * object for entity methods to this.adapter.entityName
-		// 	 * getRepository function required for this to work
-		// 	 */
-		// 	const methodsToAdd: { [key: string]: any } = {
-		// 		manager: dbRepository.manager,
-		// 		repository: dbRepository,
-		// 		getRepository: function getRepository() {
-		// 			const dataSource = dbConnection;
-		// 			if (!dataSource) throw new Error(`DataSource is not set for this entity.`);
-		// 			return dataSource.getRepository(entity);
-		// 		},
-		// 	};
-		// 	/**
-		// 	 * add base entity methods to this.adapter
-		// 	 * or add additional methods to methods object
-		// 	 */
-		// 	methodNames.forEach((method) => {
-		// 		index === 0
-		// 			? (dbConnection[method] = entity[method])
-		// 			: (methodsToAdd[method] = entity[method]);
-		// 	});
-		// 	/**
-		// 	 * add entity local methods to this.adapter or methods object
-		// 	 */
-
-		// 	[
-		// 		'hasId',
-		// 		'save',
-		// 		'remove',
-		// 		'softRemove',
-		// 		'recover',
-		// 		'reload',
-		// 		'useDataSource',
-		// 		// 'getRepository', // causing issue with typeormdbadapter class getRepository
-		// 		'target',
-		// 		'getId',
-		// 		'createQueryBuilder',
-		// 		'create',
-		// 		'merge',
-		// 		'preload',
-		// 		'insert',
-		// 		'update',
-		// 		'upsert',
-		// 		'delete',
-		// 		'count',
-		// 		'countBy',
-		// 		'sum',
-		// 		'average',
-		// 		'minimum',
-		// 		'maximum',
-		// 		'find',
-		// 		'findBy',
-		// 		'findAndCount',
-		// 		'findAndCountBy',
-		// 		'findOne',
-		// 		'findOneBy',
-		// 		'findOneOrFail',
-		// 		'findOneByOrFail',
-		// 		'query',
-		// 		'clear',
-		// 	].forEach((method) => {
-		// 		/**
-		// 		 * add base entity methods to this.adapter if index === 0
-		// 		 * or add additional methods to methods object
-		// 		 */
-		// 		index === 0
-		// 			? (dbConnection[method] = entity[method])
-		// 			: (methodsToAdd[method] = entity[method]);
-		// 	});
-		// 	/**
-		// 	 * apply entity methods object to this.adapter.entityName
-		// 	 */
-		// 	/* !entity['save']
-		// 		? this.broker.logger.warn(
-		// 				`Entity class ${entityName} does not extend TypeORM BaseEntity, use data mapping with this.adapter.repository instead of active record methodology.`,
-		// 		  )
-		// 		: */ index !== 0 ? (dbConnection[entityName] = { ...methodsToAdd }) : null;
-		// });
-		// create a new connection
-		this.connectionMap.set(dbConnection.name, dbConnection);
-		return Promise.resolve(activeConneciton);
+			// create a new connection
+			this.connectionMap.set(dbConnection.name, dbConnection);
+		}
+		return resolve(activeConneciton);
 	}
 }
