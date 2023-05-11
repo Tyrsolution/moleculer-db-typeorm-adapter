@@ -20,6 +20,7 @@ A TypeORM adapter for moleculer
 - Database connections for service start and stop when service does, so closing db connection not necessary.
 - Setting idField in service schema is used to specify own preference and obfusicate the true db id field in teh entire response, includng returned relations. This gets converted to the actual db field name automatically when querying the database, then converted back to idField on response. if you wish to use teh actual db id field of the database, change idField to the database id field name.
 - The service setting ```fields:[]``` filters the response, just like in moleculer-db, so if you do change the idField in settings, be sure to change the id field in service settings ```fields``` as well.
+- Enhanced list method that converts moleculer-db list paramaters to typeorm or use typeorm ```FindManyOptions`` paramaters [FindManyOptions](https://github.com/typeorm/typeorm/blob/d8a2e3730f12bb2b8e521635e176a284594121f3/src/find-options/FindManyOptions.ts). List can return relations, though this could be process intensive depending on the amount of relations and entities returned.
 
 ## Install
 #### NPM

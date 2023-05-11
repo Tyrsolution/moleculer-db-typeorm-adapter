@@ -473,10 +473,13 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 				),
 			);
 		}
-		if (modifiedFindParams.relations && typeof modifiedFindParams.relations === 'string') {
+		if (
+			has(modifiedFindParams, 'relations') &&
+			typeof modifiedFindParams.relations === 'string'
+		) {
 			modifiedFindParams.relations = JSON.parse(modifiedFindParams.relations);
 		}
-		if (modifiedFindParams.where && typeof modifiedFindParams.where === 'string') {
+		if (has(modifiedFindParams, 'where') && typeof modifiedFindParams.where === 'string') {
 			modifiedFindParams.where = JSON.parse(modifiedFindParams.where);
 		}
 		let modifiedCountParams;
@@ -497,10 +500,10 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 				),
 			);
 		}
-		if (modifiedCountParams.relations && typeof modifiedCountParams.relations === 'string') {
+		if (has(modifiedCountParams, 'relations')) {
 			delete modifiedCountParams.relations;
 		}
-		if (modifiedCountParams.where && typeof modifiedCountParams.where === 'string') {
+		if (has(modifiedCountParams, 'where') && typeof modifiedCountParams.where === 'string') {
 			modifiedCountParams.where = JSON.parse(modifiedCountParams.where);
 		}
 		delete modifiedFindParams.pageSize;
