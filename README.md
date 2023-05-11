@@ -12,12 +12,15 @@ A TypeORM adapter for moleculer
 
 - All supported TypeORM databases
 - Active Record methodology for entities or data mapping methodology if entity class doesn't extend TypeORM BaseEntity built in
-- Connection Manager - manage your existing connections or create new ones to different database systems on the same service.
+- Connection Manager - manage your existing connections or create new ones to different database systems on the same service. New connections are a new instance of ```TypeORMDbAdapter``` if ```true``` is added after datasource options. If ```true``` is not specified, then the connection will be created with raw TypeORM datasource and not inherit class methods, only TypeORM methods will be available (about the same as using typeorm by itself).
 - All entities added to TypeORMDbAdapter and model array are added to this.adapter
   - Base entity ```this.adapter```
-  - any aditional entity ```this.adapter.<entity name>```
-- Repository and entityManager surfaced for ```this.adapter``` and additional entities ```this.adapter.<entity name>``` if more advanced TypeORM features are required
-- Database connection starts and stops when service does
+  - any additional entity ```this.adapter.<entity name>``` when model has more than one entity. Note: additional entities added to ```model:``` are tables in the same database.
+- Repository and entityManager surfaced for ```this.adapter``` and additional entities on same adapter instance  ```this.adapter.<entity name>``` if more advanced TypeORM features are required
+- Database connections for service start and stop when service does, so closing db connection not necessary.
+- Setting ```idField``` in service schema is used to specify own preference and obfusicate the true db id field in the entire response, includng returned relations. This gets converted to the actual db field name automatically when querying the database, then converted back to idField on response. If you wish to use the actual db id field of the database, change idField to the database id field name.
+- The service setting ```fields:[]``` filters the response, just like in moleculer-db, so if you do change the idField in settings, be sure to change the id field in service settings ```fields``` as well.
+- Enhanced list method that converts moleculer-db list paramaters to typeorm paramaters or use typeorm ```FindManyOptions``` paramaters instead [FindManyOptions](https://github.com/typeorm/typeorm/blob/d8a2e3730f12bb2b8e521635e176a284594121f3/src/find-options/FindManyOptions.ts). List can return relations, though this could be process intensive depending on the amount of relations and entities returned.
 
 ## Install
 #### NPM
@@ -46,6 +49,34 @@ service: {
 
     model: TypeProduct || [TypeProduct, TypeProduct2], // accepts single entity or array of entities.
     ...
+}
+```
+
+Create a new db connection in service (preferably in service started lifecycle handler):
+```js
+async started() {
+    this.logger.debug('♻ User service created');
+    /**
+     * Creates the new connection using conneciton manager of the existing adapter in service,
+     * adding true after the data source options tells connctionmanager to create a new instance
+     * of TypeORMDbAdapter to the specified database. This in turn allows the new connection to have multiple entities (db tables)
+     * applied that are added to the new connection. In this case below this.products would query the ProductEntity
+     * table of database and this.products.<additional entity> would query that table in teh same db.
+     */
+    const productsConnection = await this.adapter.connectionManager?.create(
+        {
+            name: 'products',
+            type: 'better-sqlite3',
+            database: `temp/dbname_product.db`,
+            synchronize: true,
+            logging: [/* 'query', */ 'error'],
+            entities: [ProductEntity],
+        },
+        true,
+    )!;
+    await productsConnection.init(this.broker, this); // needed to initialize the conection with broker and service
+    await productsConnection.connect(); // connects to the database
+    this.products = productsConnection; // assigns new connection to service and can be called with this.products
 }
 ```
 
@@ -349,7 +380,7 @@ List entities by filters and pagination results.
 | Property | Type | Default | Description |
 | -------- | ---- | ------- | ----------- |
 | `ctx` | `Context` | **required** | Context instance. |
-| `params` | `Object` | - | Parameters. |
+| `params` | `FindManyOptions.<Object>` | - | Optional parameters. |
 
 ### Results
 **Type:** `Object`
@@ -357,9 +388,25 @@ List entities by filters and pagination results.
 List of found entities and count.
 
 
+## `beforeSaveTransformID` 
+
+Transforms 'idField' into expected db id field.
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `entity` | `Object` | **required** |  |
+| `idField` | `String` | **required** |  |
+
+### Results
+**Type:** `Object`
+
+Modified entity
+
+
 ## `afterRetrieveTransformID` 
 
-Transforms NeDB's '_id' into user defined 'idField'
+Transforms db field into user defined 'idField'
 
 ### Parameters
 | Property | Type | Default | Description |
@@ -381,6 +428,21 @@ Encode ID of entity.
 | Property | Type | Default | Description |
 | -------- | ---- | ------- | ----------- |
 | `id` | `any` | **required** |  |
+
+### Results
+**Type:** `any`
+
+
+
+
+## `beforeQueryTransformID` 
+
+Transform idField into the name of the id field in db
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `idField` | `any` | **required** |  |
 
 ### Results
 **Type:** `any`
@@ -548,25 +610,9 @@ Convert DB entity to JSON object
 
 
 
-## `beforeSaveTransformID` 
-
-Transforms 'idField' into NeDB's '_id'
-
-### Parameters
-| Property | Type | Default | Description |
-| -------- | ---- | ------- | ----------- |
-| `entity` | `Object` | **required** |  |
-| `idField` | `String` | **required** |  |
-
-### Results
-**Type:** `Object`
-
-Modified entity
-
-
 ## `authorizeFields` 
 
-Authorize the required field list. Remove fields which is not exist in the `this.settings.fields`
+Authorize the required field list. Remove fields which is not exist in the `this.service.settings.fields`
 
 ### Parameters
 | Property | Type | Default | Description |
@@ -591,6 +637,22 @@ Update an entity by ID
 
 ### Results
 **Type:** `Promise`
+
+
+
+
+## `sanitizeParams` 
+
+Sanitize context parameters at `find` action.
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `ctx` | `Context` | **required** |  |
+| `params` | `Object` | **required** |  |
+
+### Results
+**Type:** `Object`
 
 
 
@@ -721,6 +783,7 @@ Connection won't be established, you'll need to manually call connect method to 
 | Property | Type | Default | Description |
 | -------- | ---- | ------- | ----------- |
 | `options` | `Object` | **required** | TypeORM data source connection options |
+| `newConnection` | `boolean` | `false` | Toggle to create a new instance of TypeORMDbAdapter. |
 
 ### Results
 **Type:** `Promise.<connection>`
