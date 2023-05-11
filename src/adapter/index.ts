@@ -19,7 +19,6 @@ import {
 	isObject,
 	isString,
 	isUndefined,
-	mapKeys,
 	replace,
 	set,
 	uniq,
@@ -38,7 +37,7 @@ import {
 	In,
 } from 'typeorm';
 import ConnectionManager from './connectionManager';
-const type = require('typeof-items');
+// const type = require('typeof-items');
 
 /**
  * Moleculer TypeORM Adapter
