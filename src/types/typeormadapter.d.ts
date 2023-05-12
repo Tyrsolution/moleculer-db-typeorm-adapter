@@ -97,7 +97,7 @@ declare class ConnectionManager {
 	 *
 	 * @connectionmanager
 	 */
-	create(options: DataSourceOptions, newConnection: boolean): Promise<any>;
+	create(options: DataSourceOptions, newConnection?: boolean): Promise<any>;
 }
 
 export interface DbAdapter<Entity extends ObjectLiteral> {

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<title>Document</title>
+		<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+		<meta name="description" content="Description" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0" />
+		<link rel="stylesheet" href="//unpkg.com/docsify-accordify/src/assets/default.css" />
+		<link rel="stylesheet" href="//unpkg.com/docsify-accordion/src/style.css" />
+		<link
+			rel="stylesheet"
+			data-style-group="themeable"
+			media="(prefers-color-scheme: light)"
+			href="https://cdn.jsdelivr.net/npm/docsify-themeable@0/dist/css/theme-simple.css"
+		/>
+		<link rel="stylesheet" href="assets/css/main.css" />
+		<script>
+			window.dataLayer = window.dataLayer || [];
+			function gtag() {
+				dataLayer.push(arguments);
+			}
+			gtag('js', new Date());
+			gtag('config', 'G-9LYZ7R080K');
+		</script>
+	</head>
+	<body>
+		<div id="app"></div>
+		<script>
+			window.$docsify = {
+				name: 'moleculer-db-typeorm-adapter',
+				repo: 'https://github.com/Tyrsolution/moleculer-db-typeorm-adapter',
+				coverpage: 'coverpage.md',
+				homepage: 'introduction.md',
+				loadSidebar: 'sidebar.md',
+
+				// NAVIGATION
+				// -----------------------------------------------------------------
+				alias: {
+					'.*?/changelog':
+						'https://raw.githubusercontent.com/jhildenbiddle/docsify-themeable/master/CHANGELOG.md',
+				},
+				auto2top: true,
+				maxLevel: 3,
+				subMaxLevel: 3,
+
+				// PLUGINS
+				// -----------------------------------------------------------------
+				//  ethicalAds: {
+				//      eaPublisher: 'jhildenbiddle-github-io',
+				//  },
+				executeScript: true,
+				search: {
+					depth: 3,
+					noData: 'No results!',
+					placeholder: 'Search...',
+				},
+				plugins: [
+					// Restores initial <title>
+					function persistTitle(hook, vm) {
+						var titleElm = document.querySelector('title');
+						var rootTitle = titleElm && titleElm.textContent;
+						var pageTitlePrefix = window.$docsify.name
+							? window.$docsify.name + ' - '
+							: '';
+
+						if (rootTitle) {
+							hook.doneEach(function () {
+								var currentTitle = titleElm.textContent;
+								var isRoot = !/\/[a-z]/.test(location.hash);
+								var newTitle = isRoot ? rootTitle : pageTitlePrefix + currentTitle;
+
+								titleElm.textContent = newTitle;
+							});
+						}
+					},
+				],
+
+				themeable: {
+					readyTransition: true, // default
+					responsiveTables: true, // default
+				},
+
+				/* accordify: {
+					prerenderComments: true, // default
+					selectors: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'], // default value
+					debug: false, // default value
+				}, */
+			};
+		</script>
+		<script src="assets/js/main.js"></script>
+		<!-- docsify -->
+		<script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/docsify.min.js"></script>
+
+		<!-- docsify-themeable -->
+		<script src="https://cdn.jsdelivr.net/npm/docsify-themeable@0/dist/js/docsify-themeable.min.js"></script>
+		<!-- Recommended -->
+		<script src="https://cdn.jsdelivr.net/npm/docsify-plugin-ethicalads@1"></script>
+		<script src="https://cdn.jsdelivr.net/npm/docsify-tabs@1/dist/docsify-tabs.min.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/docsify-copy-code@2/dist/docsify-copy-code.min.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/docsify-pagination@2/dist/docsify-pagination.min.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/plugins/external-script.min.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/plugins/search.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/plugins/zoom-image.min.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-bash.min.js"></script>
+		<script src="//unpkg.com/docsify-accordion/src/index.js"></script>
+	</body>
+</html>
