@@ -28,6 +28,7 @@
 		"microservice",
 		"typeorm"
 	],
+	"homepage": "https://tyrsolution.github.io/moleculer-db-typeorm-adapter",
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/tyrsolution/moleculer-db-typeorm-adapter.git"
