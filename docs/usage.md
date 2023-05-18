@@ -43,7 +43,7 @@ this.products = productsConnection;
 The connection manager creates, gets, removes, lists, and closes connections. The connection store is service specific and static, so each service has and manages its own connections.
 
 ### List connections
-To list alll connections on the current service use `this.adapter.connectionMamaner.get()`. This will produce an array of current connections on teh service both active and inactive.
+To list alll connections on the current service use `this.adapter.connectionMananer.get()`. This will produce an array of current connections on teh service both active and inactive.
 
 ### Get Connection
 To get a connection on the current service use `this.adapter.connectionManager.get(<name of connection as string>)`. The connection returned will be the full connection that will need to be initialized and then connected if it is not alerady active.
