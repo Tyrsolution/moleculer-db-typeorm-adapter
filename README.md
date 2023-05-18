@@ -304,28 +304,9 @@ It will be called in `broker.stop()` and is used internally.
 
 
 
-## `getRepository` 
-
-Gets current entity's Repository and returns it.
-Needed for active record to work from base entity and
-Uses this.entity which could be an entity or an array of entities.
-If this._entity is an array, uses first entity in array for active record.
-Used internally by this.adapter for base conection.
-
-### Parameters
-| Property | Type | Default | Description |
-| -------- | ---- | ------- | ----------- |
-| `this` | `T` | **required** |  |
-
-### Results
-**Type:** `Repository.<Entity>`
-
-
-
-
 ## `findByIdWO` 
 
-Gets item by id. Can use find options
+Gets item by id. Can use find options, no where clause.
 
 ### Parameters
 | Property | Type | Default | Description |
@@ -358,7 +339,8 @@ Gets item by id. No find options
 
 ## `findByIds` 
 
-Gets items by id.
+Gets multiple items by id.
+No find options
 
 ### Parameters
 | Property | Type | Default | Description |
@@ -374,13 +356,13 @@ Gets items by id.
 
 ## `list` 
 
-List entities by filters and pagination results.
+List entities from db using filters and pagination results.
 
 ### Parameters
 | Property | Type | Default | Description |
 | -------- | ---- | ------- | ----------- |
 | `ctx` | `Context` | **required** | Context instance. |
-| `params` | `FindManyOptions.<Object>` | - | Optional parameters. |
+| `params` | `ListParams.<Object>` | - | Optional parameters. |
 
 ### Results
 **Type:** `Object`
@@ -390,7 +372,7 @@ List of found entities and count.
 
 ## `beforeSaveTransformID` 
 
-Transforms 'idField' into expected db id field.
+Transforms user defined idField into expected db id field.
 
 ### Parameters
 | Property | Type | Default | Description |
@@ -406,7 +388,7 @@ Modified entity
 
 ## `afterRetrieveTransformID` 
 
-Transforms db field into user defined 'idField'
+Transforms db field into user defined idField service property
 
 ### Parameters
 | Property | Type | Default | Description |
@@ -437,7 +419,7 @@ Encode ID of entity.
 
 ## `beforeQueryTransformID` 
 
-Transform idField into the name of the id field in db
+Transform user defined idField service property into the expected id field of db.
 
 ### Parameters
 | Property | Type | Default | Description |
@@ -467,7 +449,9 @@ Decode ID of entity.
 
 ## `transformDocuments` 
 
-Transform the fetched documents
+Transform the fetched documents by converting id to user defind idField,
+filtering the fields according to the fields service property,
+an populating the document with the relations specified in the populate service property.
 
 ### Parameters
 | Property | Type | Default | Description |

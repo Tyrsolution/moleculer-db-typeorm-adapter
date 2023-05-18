@@ -5,29 +5,167 @@
  */
 import { Service, ServiceBroker } from 'moleculer';
 import {
+	AggregateOptions,
+	AggregationCursor,
+	AnyBulkWriteOperation,
+	BulkWriteOptions,
+	BulkWriteResult,
+	CollStats,
+	CollStatsOptions,
+	Collection,
+	CommandOperationOptions,
+	CreateIndexesOptions,
 	DataSource,
 	DataSourceOptions,
 	DeepPartial,
+	DeleteOptions,
 	DeleteResult,
 	EntityManager,
 	EntityTarget,
+	Filter,
+	FindCursor,
 	FindManyOptions,
+	FindOneAndDeleteOptions,
+	FindOneAndReplaceOptions,
+	FindOneAndUpdateOptions,
 	FindOneOptions,
+	FindOptionsOrder,
+	FindOptionsRelations,
+	FindOptionsSelect,
 	FindOptionsWhere,
+	IndexDescription,
+	InsertManyResult,
+	InsertOneOptions,
+	InsertOneResult,
 	InsertResult,
+	JoinOptions,
+	ListIndexesCursor,
+	ListIndexesOptions,
 	ObjectId,
 	ObjectLiteral,
+	OrderedBulkOperation,
 	QueryRunner,
 	RemoveOptions,
+	ReplaceOptions,
 	Repository,
 	SaveOptions,
 	SelectQueryBuilder,
+	UnorderedBulkOperation,
+	UpdateFilter,
+	UpdateOptions,
 	UpdateResult,
 } from 'typeorm';
 import { PickKeysByType } from 'typeorm/common/PickKeysByType';
 import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 import { UpsertOptions } from 'typeorm/repository/UpsertOptions';
 
+export interface ListParams {
+	/**
+	 * Moleculer-db paramaters
+	 */
+	populate?: String | String[];
+	fields?: String | String[];
+	excludeFields?: String | String[];
+	page?: Number;
+	pageSize?: Number;
+	sort?: String;
+	search?: String;
+	searchFields?: String | String[];
+	query?: Object | String;
+	limit?: String | Number;
+	offset?: String | Number;
+	/**
+	 * TypeORM paramaters
+	 * If paramaters are missing it's because they are deprecated so we don't need them
+	 * or there have been additoins to the typeorm library that are not yet implemented.
+	 */
+	/**
+	 * Offset (paginated) where from entities should be taken.
+	 */
+	skip?: number;
+	/**
+	 * Limit (paginated) - max number of entities should be taken.
+	 */
+	take?: number;
+	/**
+	 * Adds a comment with the supplied string in the generated query.  This is
+	 * helpful for debugging purposes, such as finding a specific query in the
+	 * database server's logs, or for categorization using an APM product.
+	 */
+	comment?: string;
+	/**
+	 * Specifies what columns should be retrieved.
+	 */
+	select?: FindOptionsSelect<any>;
+
+	/**
+	 * Simple condition that should be applied to match entities.
+	 */
+	where?: FindOptionsWhere<any>[] | FindOptionsWhere<any>;
+
+	/**
+	 * Indicates what relations of entity should be loaded (simplified left join form).
+	 */
+	relations?: FindOptionsRelations<any>;
+	/**
+	 * Specifies how relations must be loaded - using "joins" or separate queries.
+	 * If you are loading too much data with nested joins it's better to load relations
+	 * using separate queries.
+	 *
+	 * Default strategy is "join", but default can be customized in connection options.
+	 */
+	relationLoadStrategy?: 'join' | 'query';
+	/**
+	 * Order, in which entities should be ordered.
+	 */
+	order?: FindOptionsOrder<any>;
+	/**
+	 * Enables or disables query result caching.
+	 */
+	cache?: boolean | number | { id: any; milliseconds: number };
+	/**
+	 * Indicates what locking mode should be used.
+	 *
+	 * Note: For lock tables, you must specify the table names and not the relation names
+	 */
+	lock?:
+		| { mode: 'optimistic'; version: number | Date }
+		| {
+				mode:
+					| 'pessimistic_read'
+					| 'pessimistic_write'
+					| 'dirty_read'
+					/**
+					 * "pessimistic_partial_write" and "pessimistic_write_or_fail" are deprecated and
+					 * will be removed in a future version. Use onLocked instead.
+					 */
+					| 'pessimistic_partial_write'
+					| 'pessimistic_write_or_fail'
+					| 'for_no_key_update'
+					| 'for_key_share';
+				tables?: string[];
+				onLocked?: 'nowait' | 'skip_locked';
+		  };
+
+	/**
+	 * Indicates if soft-deleted rows should be included in entity result.
+	 */
+	withDeleted?: boolean;
+	/**
+	 * If sets to true then loads all relation ids of the entity and maps them into relation values (not relation objects).
+	 * If array of strings is given then loads only relation ids of the given properties.
+	 */
+	loadRelationIds?: boolean | { relations?: string[]; disableMixedMap?: boolean };
+	/**
+	 * Indicates if eager relations should be loaded or not.
+	 * By default, they are loaded when find methods are used.
+	 */
+	loadEagerRelations?: boolean;
+	/**
+	 * If this is set to true, SELECT query in a `find` method will be executed in a transaction.
+	 */
+	transaction?: boolean;
+}
 declare class ConnectionManager {
 	/**
 	 * List of connections registered in this connection manager.
@@ -429,6 +567,164 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	 * @see https://stackoverflow.com/a/5972738/925151
 	 */
 	clear<T extends Entity>(this: { new (): T }): Promise<void>;
+	/**
+	 * MongoDB Only methods
+	 */
+	/**
+	 * Creates a cursor for a query that can be used to iterate over results from MongoDB.
+	 */
+	createCursor<T = any>(query?: Filter<Entity>): FindCursor<T>;
+	/**
+	 * Creates a cursor for a query that can be used to iterate over results from MongoDB.
+	 * This returns modified version of cursor that transforms each result into Entity model.
+	 */
+	createEntityCursor(query?: Filter<Entity>): FindCursor<Entity>;
+	/**
+	 * Execute an aggregation framework pipeline against the collection.
+	 */
+	aggregate<R = any>(
+		pipeline: ObjectLiteral[],
+		options?: AggregateOptions,
+	): AggregationCursor<Entity>;
+	/**
+	 * Execute an aggregation framework pipeline against the collection.
+	 * This returns modified version of cursor that transforms each result into Entity model.
+	 */
+	aggregateEntity(
+		pipeline: ObjectLiteral[],
+		options?: AggregateOptions,
+	): AggregationCursor<Entity>;
+	/**
+	 * Perform a bulkWrite operation without a fluent API.
+	 */
+	bulkWrite(
+		operations: AnyBulkWriteOperation[],
+		options?: BulkWriteOptions,
+	): Promise<BulkWriteResult>;
+	/**
+	 * Creates an index on the db and collection.
+	 */
+	createCollectionIndex(
+		fieldOrSpec: string | any,
+		options?: CreateIndexesOptions,
+	): Promise<string>;
+	/**
+	 * Creates multiple indexes in the collection, this method is only supported for MongoDB 2.6 or higher.
+	 * Earlier version of MongoDB will throw a command not supported error.
+	 * Index specifications are defined at http://docs.mongodb.org/manual/reference/command/createIndexes/.
+	 */
+	createCollectionIndexes(indexSpecs: IndexDescription[]): Promise<string[]>;
+	/**
+	 * Delete multiple documents on MongoDB.
+	 */
+	deleteMany(query: ObjectLiteral, options?: DeleteOptions): Promise<DeleteResult>;
+	/**
+	 * Delete a document on MongoDB.
+	 */
+	deleteOne(query: ObjectLiteral, options?: DeleteOptions): Promise<DeleteResult>;
+	/**
+	 * The distinct command returns returns a list of distinct values for the given key across a collection.
+	 */
+	distinct(key: string, query: ObjectLiteral, options?: CommandOperationOptions): Promise<any>;
+	/**
+	 * Drops an index from this collection.
+	 */
+	dropCollectionIndex(indexName: string, options?: CommandOperationOptions): Promise<any>;
+	/**
+	 * Drops all indexes from the collection.
+	 */
+	dropCollectionIndexes(): Promise<any>;
+	/**
+	 * Find a document and delete it in one atomic operation, requires a write lock for the duration of the operation.
+	 */
+	findOneAndDelete(query: ObjectLiteral, options?: FindOneAndDeleteOptions): Promise<Document>;
+	/**
+	 * Find a document and replace it in one atomic operation, requires a write lock for the duration of the operation.
+	 */
+	findOneAndReplace(
+		query: ObjectLiteral,
+		replacement: Object,
+		options?: FindOneAndReplaceOptions,
+	): Promise<Document>;
+	/**
+	 * Find a document and update it in one atomic operation, requires a write lock for the duration of the operation.
+	 */
+	findOneAndUpdate(
+		query: ObjectLiteral,
+		update: Object,
+		options?: FindOneAndUpdateOptions,
+	): Promise<Document>;
+	/**
+	 * Retrieve all the indexes on the collection.
+	 */
+	collectionIndexes(): Promise<any>;
+	/**
+	 * Retrieve all the indexes on the collection.
+	 */
+	collectionIndexExists(indexes: string | string[]): Promise<boolean>;
+	/**
+	 * Retrieves this collections index info.
+	 */
+	collectionIndexInformation(options?: { full: boolean }): Promise<any>;
+	/**
+	 * Initiate an In order bulk write operation, operations will be serially executed in the order they are added, creating a new operation for each switch in types.
+	 */
+	initializeOrderedBulkOp(options?: BulkWriteOptions): OrderedBulkOperation;
+	/**
+	 * Initiate a Out of order batch write operation. All operations will be buffered into insert/update/remove commands executed out of order.
+	 */
+	initializeUnorderedBulkOp(options?: BulkWriteOptions): UnorderedBulkOperation;
+	/**
+	 * Inserts an array of documents into MongoDB.
+	 */
+	insertMany(
+		docs: ObjectLiteral[],
+		options?: BulkWriteOptions,
+	): Promise<InsertManyResult<Document>>;
+	/**
+	 * Inserts a single document into MongoDB.
+	 */
+	insertOne(doc: ObjectLiteral, options?: InsertOneOptions): Promise<InsertOneResult>;
+	/**
+	 * Returns if the collection is a capped collection.
+	 */
+	isCapped(): Promise<any>;
+	/**
+	 * Get the list of all indexes information for the collection.
+	 */
+	listCollectionIndexes(options?: ListIndexesOptions): ListIndexesCursor;
+	/**
+	 * Reindex all indexes on the collection Warning: reIndex is a blocking operation (indexes are rebuilt in the foreground) and will be slow for large collections.
+	 */
+	rename(newName: string, options?: { dropTarget?: boolean }): Promise<Collection<Document>>;
+	/**
+	 * Replace a document on MongoDB.
+	 */
+	replaceOne(
+		query: ObjectLiteral,
+		doc: ObjectLiteral,
+		options?: ReplaceOptions,
+	): Promise<Document | UpdateResult>;
+	/**
+	 * Get all the collection statistics.
+	 */
+	stats(options?: CollStatsOptions): Promise<CollStats>;
+	/**
+	 * Update multiple documents on MongoDB.
+	 */
+	updateMany(
+		query: ObjectLiteral,
+		update: UpdateFilter<Document>,
+		options?: UpdateOptions,
+	): Promise<Document | UpdateResult>;
+	/**
+	 * Update a single document on MongoDB.
+	 */
+	updateOne(
+		query: ObjectLiteral,
+		update: UpdateFilter<Document>,
+		options?: UpdateOptions,
+	): Promise<Document | UpdateResult>;
 	/** additional custom methods */
 	/**
 	 * Transform the id key to the name of the id field in db
@@ -487,7 +783,7 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	 *
 	 * @returns {Object} List of found entities and count.
 	 */
-	list(ctx: any, params: any): Promise<any>;
+	list(ctx: any, params: ListParams): Promise<any>;
 
 	/**
 	 * Transforms NeDB's '_id' into user defined 'idField'
@@ -1028,6 +1324,164 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	 * @see https://stackoverflow.com/a/5972738/925151
 	 */
 	clear<T extends Entity>(this: { new (): T }): Promise<void>;
+	/**
+	 * MongoDB Only methods
+	 */
+	/**
+	 * Creates a cursor for a query that can be used to iterate over results from MongoDB.
+	 */
+	createCursor<T = any>(query?: Filter<Entity>): FindCursor<T>;
+	/**
+	 * Creates a cursor for a query that can be used to iterate over results from MongoDB.
+	 * This returns modified version of cursor that transforms each result into Entity model.
+	 */
+	createEntityCursor(query?: Filter<Entity>): FindCursor<Entity>;
+	/**
+	 * Execute an aggregation framework pipeline against the collection.
+	 */
+	aggregate<R = any>(
+		pipeline: ObjectLiteral[],
+		options?: AggregateOptions,
+	): AggregationCursor<Entity>;
+	/**
+	 * Execute an aggregation framework pipeline against the collection.
+	 * This returns modified version of cursor that transforms each result into Entity model.
+	 */
+	aggregateEntity(
+		pipeline: ObjectLiteral[],
+		options?: AggregateOptions,
+	): AggregationCursor<Entity>;
+	/**
+	 * Perform a bulkWrite operation without a fluent API.
+	 */
+	bulkWrite(
+		operations: AnyBulkWriteOperation[],
+		options?: BulkWriteOptions,
+	): Promise<BulkWriteResult>;
+	/**
+	 * Creates an index on the db and collection.
+	 */
+	createCollectionIndex(
+		fieldOrSpec: string | any,
+		options?: CreateIndexesOptions,
+	): Promise<string>;
+	/**
+	 * Creates multiple indexes in the collection, this method is only supported for MongoDB 2.6 or higher.
+	 * Earlier version of MongoDB will throw a command not supported error.
+	 * Index specifications are defined at http://docs.mongodb.org/manual/reference/command/createIndexes/.
+	 */
+	createCollectionIndexes(indexSpecs: IndexDescription[]): Promise<string[]>;
+	/**
+	 * Delete multiple documents on MongoDB.
+	 */
+	deleteMany(query: ObjectLiteral, options?: DeleteOptions): Promise<DeleteResult>;
+	/**
+	 * Delete a document on MongoDB.
+	 */
+	deleteOne(query: ObjectLiteral, options?: DeleteOptions): Promise<DeleteResult>;
+	/**
+	 * The distinct command returns returns a list of distinct values for the given key across a collection.
+	 */
+	distinct(key: string, query: ObjectLiteral, options?: CommandOperationOptions): Promise<any>;
+	/**
+	 * Drops an index from this collection.
+	 */
+	dropCollectionIndex(indexName: string, options?: CommandOperationOptions): Promise<any>;
+	/**
+	 * Drops all indexes from the collection.
+	 */
+	dropCollectionIndexes(): Promise<any>;
+	/**
+	 * Find a document and delete it in one atomic operation, requires a write lock for the duration of the operation.
+	 */
+	findOneAndDelete(query: ObjectLiteral, options?: FindOneAndDeleteOptions): Promise<Document>;
+	/**
+	 * Find a document and replace it in one atomic operation, requires a write lock for the duration of the operation.
+	 */
+	findOneAndReplace(
+		query: ObjectLiteral,
+		replacement: Object,
+		options?: FindOneAndReplaceOptions,
+	): Promise<Document>;
+	/**
+	 * Find a document and update it in one atomic operation, requires a write lock for the duration of the operation.
+	 */
+	findOneAndUpdate(
+		query: ObjectLiteral,
+		update: Object,
+		options?: FindOneAndUpdateOptions,
+	): Promise<Document>;
+	/**
+	 * Retrieve all the indexes on the collection.
+	 */
+	collectionIndexes(): Promise<any>;
+	/**
+	 * Retrieve all the indexes on the collection.
+	 */
+	collectionIndexExists(indexes: string | string[]): Promise<boolean>;
+	/**
+	 * Retrieves this collections index info.
+	 */
+	collectionIndexInformation(options?: { full: boolean }): Promise<any>;
+	/**
+	 * Initiate an In order bulk write operation, operations will be serially executed in the order they are added, creating a new operation for each switch in types.
+	 */
+	initializeOrderedBulkOp(options?: BulkWriteOptions): OrderedBulkOperation;
+	/**
+	 * Initiate a Out of order batch write operation. All operations will be buffered into insert/update/remove commands executed out of order.
+	 */
+	initializeUnorderedBulkOp(options?: BulkWriteOptions): UnorderedBulkOperation;
+	/**
+	 * Inserts an array of documents into MongoDB.
+	 */
+	insertMany(
+		docs: ObjectLiteral[],
+		options?: BulkWriteOptions,
+	): Promise<InsertManyResult<Document>>;
+	/**
+	 * Inserts a single document into MongoDB.
+	 */
+	insertOne(doc: ObjectLiteral, options?: InsertOneOptions): Promise<InsertOneResult>;
+	/**
+	 * Returns if the collection is a capped collection.
+	 */
+	isCapped(): Promise<any>;
+	/**
+	 * Get the list of all indexes information for the collection.
+	 */
+	listCollectionIndexes(options?: ListIndexesOptions): ListIndexesCursor;
+	/**
+	 * Reindex all indexes on the collection Warning: reIndex is a blocking operation (indexes are rebuilt in the foreground) and will be slow for large collections.
+	 */
+	rename(newName: string, options?: { dropTarget?: boolean }): Promise<Collection<Document>>;
+	/**
+	 * Replace a document on MongoDB.
+	 */
+	replaceOne(
+		query: ObjectLiteral,
+		doc: ObjectLiteral,
+		options?: ReplaceOptions,
+	): Promise<Document | UpdateResult>;
+	/**
+	 * Get all the collection statistics.
+	 */
+	stats(options?: CollStatsOptions): Promise<CollStats>;
+	/**
+	 * Update multiple documents on MongoDB.
+	 */
+	updateMany(
+		query: ObjectLiteral,
+		update: UpdateFilter<Document>,
+		options?: UpdateOptions,
+	): Promise<Document | UpdateResult>;
+	/**
+	 * Update a single document on MongoDB.
+	 */
+	updateOne(
+		query: ObjectLiteral,
+		update: UpdateFilter<Document>,
+		options?: UpdateOptions,
+	): Promise<Document | UpdateResult>;
 	/** Moleculer-db methods */
 	/**
 	 * Convert DB entity to JSON object
@@ -1040,7 +1494,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	 */
 	entityToObject(entity: any): object;
 	/**
-	 * Transforms 'idField' into NeDB's '_id'
+	 * Transforms user defined idField into expected db id field.
 	 *
 	 * @methods
 	 * @public
@@ -1052,7 +1506,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	 */
 	beforeSaveTransformID(entity: Record<string, any>, idField: string): object;
 	/**
-	 * Transforms NeDB's '_id' into user defined 'idField'
+	 * Transforms db field into user defined idField service property
 	 *
 	 * @methods
 	 * @public
@@ -1064,7 +1518,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	afterRetrieveTransformID(entity: Record<string, any>, idField: string): object;
 	/** additional custom methods */
 	/**
-	 * Transform the id key to the name of the id field in db
+	 * Transform user defined idField service property into the expected id field of db.
 	 * @methods
 	 * @param {any} idField
 	 * @returns {any}
@@ -1120,7 +1574,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	 *
 	 * @returns {Object} List of found entities and count.
 	 */
-	list(ctx: any, params: any): Promise<any>;
+	list(ctx: any, params: ListParams): Promise<any>;
 
 	/**
 	 * Transforms NeDB's '_id' into user defined 'idField'

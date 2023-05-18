@@ -19,13 +19,13 @@
 	 *   <link rel="stylesheet" data-style-group="bar" href="some/other/file.css" >
 	 */
 	function initStyleSwitcher() {
-		var SESSION_STORAGE_KEY = 'activeStylesheetHref';
-		var SESSION_VAL_SEPARATOR = '||';
+		let SESSION_STORAGE_KEY = 'activeStylesheetHref';
+		let SESSION_VAL_SEPARATOR = '||';
 
-		var isInitialized = false;
+		let isInitialized = false;
 
 		function createLinkedStylesheet(styleHref, styleGroup) {
-			var activeElm = document.createElement('link');
+			let activeElm = document.createElement('link');
 
 			activeElm.setAttribute('rel', 'stylesheet');
 			activeElm.setAttribute('href', styleHref);
@@ -42,7 +42,7 @@
 		}
 
 		function handleSwitch(styleHref, styleGroup) {
-			var activeElm = styleGroup
+			let activeElm = styleGroup
 				? document.querySelector(
 						'link[href*="' + styleHref + '"][data-style-group="' + styleGroup + '"]',
 				  )
@@ -72,7 +72,7 @@
 				styleGroup ? styleHref + SESSION_VAL_SEPARATOR + styleGroup : styleHref,
 			);
 
-			var inactiveElms = styleGroup
+			let inactiveElms = styleGroup
 				? document.querySelectorAll(
 						'link:not([href*="' +
 							styleHref +
@@ -83,8 +83,8 @@
 				: document.querySelectorAll('link:not([href*="' + styleHref + '"])');
 
 			// Disable other elms
-			for (var i = 0; i < inactiveElms.length; i++) {
-				var elm = inactiveElms[i];
+			for (const element of inactiveElms) {
+				let elm = element;
 
 				elm.disabled = true;
 
@@ -93,8 +93,8 @@
 				// required to properly apply style updates when alternate
 				// stylesheets are enabled.
 				if (window.browsersyncObserver) {
-					var linkRel = elm.getAttribute('rel') || '';
-					var linkRelAlt =
+					let linkRel = elm.getAttribute('rel') || '';
+					let linkRelAlt =
 						linkRel.indexOf('alternate') > -1
 							? linkRel
 							: (linkRel + ' alternate').trim();
@@ -115,10 +115,10 @@
 
 			// Restore active stylesheet
 			document.addEventListener('DOMContentLoaded', function () {
-				var storedData = sessionStorage.getItem(SESSION_STORAGE_KEY) || '';
-				var storedVals = storedData.split(SESSION_VAL_SEPARATOR);
-				var styleHref = storedVals[0] || '';
-				var styleGroup = storedVals[1] || '';
+				let storedData = sessionStorage.getItem(SESSION_STORAGE_KEY) || '';
+				let storedVals = storedData.split(SESSION_VAL_SEPARATOR);
+				let styleHref = storedVals[0] || '';
+				let styleGroup = storedVals[1] || '';
 
 				if (styleHref) {
 					handleSwitch(styleHref, styleGroup);

@@ -35,8 +35,10 @@ import {
 	Repository,
 	FindOneOptions,
 	In,
+	MongoEntityManager,
 } from 'typeorm';
 import ConnectionManager from './connectionManager';
+import { ListParams } from '../types/typeormadapter';
 // const type = require('typeof-items');
 
 /**
@@ -78,7 +80,6 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 */
 	connectionManager: ConnectionManager | undefined;
 	private _entity: EntitySchema<Entity> | Array<EntitySchema<Entity>> | undefined;
-	private dataSource: DataSource | undefined;
 	/**
 	 * Grants access to the entity manager of the connection.
 	 * Called using this.adapter.manager
@@ -87,7 +88,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 *
 	 * @properties
 	 */
-	manager: EntityManager | undefined;
+	manager: EntityManager | MongoEntityManager | undefined;
 	/**
 	 * Grants access to the entity repository of the connection.
 	 * Called using this.adapter.repository
@@ -152,17 +153,9 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 		 */
 		this.connectionManager = new ConnectionManager();
 		/**
-		 * set connection opts
-		 */
-		/* this.opts = {
-
-			...this.opts,
-			entities: isArray(this._entity) ? this._entity : [this._entity],
-		}; */
-		/**
 		 * create connection using this.opts & initialize db connection
 		 */
-		const db = await this.connectionManager.create(this.opts);
+		const db: DataSource = await this.connectionManager.create(this.opts);
 		this.broker.logger.info(`${this.service.name} has connected to ${db.name} database`);
 
 		/**
@@ -191,7 +184,8 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 		 * under entity name this.adapter.entityName
 		 */
 		entityArrray.forEach((entity: any, index: number) => {
-			const dbRepository = db.getRepository(entity);
+			const dbRepository: any = db.manager.getRepository(entity);
+			const dbManager: any = db.manager;
 			const entityName = dbRepository.metadata.name;
 			const methodNames = entityMethods(entity);
 			/**
@@ -199,12 +193,12 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 			 * getRepository function required for this to work
 			 */
 			const methodsToAdd: { [key: string]: any } = {
-				manager: dbRepository.manager,
+				manager: dbManager,
 				repository: dbRepository,
 				getRepository: function getRepository() {
 					const dataSource = db;
 					if (!dataSource) throw new Error(`DataSource is not set for this entity.`);
-					return dataSource.getRepository(entity);
+					return dbManager.getRepository(entity);
 				},
 			};
 			/**
@@ -221,6 +215,9 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 			 */
 
 			[
+				/**
+				 * Base entity methods
+				 */
 				'hasId',
 				'save',
 				'remove',
@@ -228,7 +225,8 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 				'recover',
 				'reload',
 				'useDataSource',
-				// 'getRepository', // causing issue with typeormdbadapter class getRepository
+				'getRepository',
+				'metadata',
 				'target',
 				'getId',
 				'createQueryBuilder',
@@ -255,14 +253,48 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 				'findOneByOrFail',
 				'query',
 				'clear',
+				/**
+				 * Mongo Entity methods
+				 */
+				'createCursor',
+				'createEntityCursor',
+				'aggregate',
+				'aggregateEntity',
+				'bulkWrite',
+				'createCollectionIndex',
+				'createCollectionIndexes',
+				'deleteMany',
+				'deleteOne',
+				'distinct',
+				'dropCollectionIndex',
+				'dropCollectionIndexes',
+				'findOneAndDelete',
+				'findOneAndReplace',
+				'findOneAndUpdate',
+				'collectionIndexes',
+				'collectionIndexExists',
+				'collectionIndexInformation',
+				'initializeOrderedBulkOp',
+				'initializeUnorderedBulkOp',
+				'insertMany',
+				'insertOne',
+				'isCapped',
+				'listCollectionIndexes',
+				'rename',
+				'replaceOne',
+				'stats',
+				'updateMany',
+				'updateOne',
 			].forEach((method) => {
 				/**
 				 * add base entity methods to this.adapter if index === 0
 				 * or add additional methods to methods object
 				 */
-				index === 0
-					? (this[method] = entity[method])
-					: (methodsToAdd[method] = entity[method]);
+				if (dbRepository[method]) {
+					index === 0
+						? (this[method] = dbRepository[method])
+						: (methodsToAdd[method] = dbRepository[method]);
+				}
 			});
 			/**
 			 * apply entity methods object to this.adapter.entityName
@@ -278,7 +310,6 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 						findById: this.findById,
 						findByIds: this.findByIds,
 						list: this.list,
-						afterRetrieveTransformID: this.afterRetrieveTransformID,
 						encodeID: this.encodeID,
 						decodeID: this.decodeID,
 						transformDocuments: this.transformDocuments,
@@ -293,6 +324,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 						entityToObject: this.entityToObject,
 						beforeSaveTransformID: this.beforeSaveTransformID,
 						beforeQueryTransformID: this.beforeQueryTransformID,
+						afterRetrieveTransformID: this.afterRetrieveTransformID,
 						authorizeFields: this.authorizeFields,
 						updateById: this.updateById,
 						broker: this.broker,
@@ -309,7 +341,9 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 		/**
 		 * set repository on this.adapter
 		 */
-		this.repository = db.getRepository(isArray(this._entity) ? this._entity[0] : this._entity!);
+		this.repository = db.manager.getRepository(
+			isArray(this._entity) ? this._entity[0] : this._entity!,
+		);
 		// this.repository = db.getRepository(entityArrray[0]);
 
 		/**
@@ -355,26 +389,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	// -------------------------------------------------------------------------
 
 	/**
-	 * Gets current entity's Repository and returns it.
-	 * Needed for active record to work from base entity and
-	 * Uses this.entity which could be an entity or an array of entities.
-	 * If this._entity is an array, uses first entity in array for active record.
-	 * Used internally by this.adapter for base conection.
-	 * @methods
-	 * @private
-	 * @param {T} this
-	 * @returns {Repository<Entity>}
-	 * @memberof TypeORMDbAdapter
-	 *
-	 */
-	getRepository<T extends this>(this: T): Repository<Entity> {
-		const dataSource = this.dataSource;
-		if (!dataSource) throw new Error(`DataSource is not set for this entity.`);
-		return dataSource.getRepository(isArray(this._entity!) ? this._entity[0] : this._entity!);
-	}
-
-	/**
-	 * Gets item by id. Can use find options
+	 * Gets item by id. Can use find options, no where clause.
 	 * @methods
 	 * @param {Partial<T>} key - primary column name
 	 * @param {string | number} id - id of entity
@@ -388,10 +403,16 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 		findOptions?: FindOneOptions<T>,
 	): Promise<T | undefined> {
 		const dbID = this.beforeQueryTransformID(key);
-		const entity = await this['findOneOrFail']({
-			where: { [dbID]: In([id]) },
-			...findOptions,
-		});
+		const entity =
+			this.opts.type !== 'mongodb'
+				? await this['findOneOrFail']({
+						where: { [dbID]: In([id]) },
+						...findOptions,
+				  })
+				: await this['findOneOrFail']({
+						where: { [dbID]: { $in: [id] } },
+						...findOptions,
+				  });
 		return this.afterRetrieveTransformID(entity, this.service.settings.idField) as
 			| T
 			| undefined;
@@ -411,14 +432,18 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 		id: string | number,
 	): Promise<T | undefined> {
 		const dbID = this.beforeQueryTransformID(key);
-		const entity = await this['findOneByOrFail']({ [dbID]: In([id]) });
+		const entity =
+			this.opts.type !== 'mongodb'
+				? await this['findOneByOrFail']({ [dbID]: In([id]) })
+				: await this['findOneByOrFail']({ [dbID]: In([id]) });
 		return this.afterRetrieveTransformID(entity, this.service.settings.idField) as
 			| T
 			| undefined;
 	}
 
 	/**
-	 * Gets items by id.
+	 * Gets multiple items by id.
+	 * No find options
 	 * @methods
 	 * @param {Partial<T>} key - primary column name
 	 * @param {Array<string> | Array<number>} ids - ids of entity
@@ -438,21 +463,21 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	}
 
 	/**
-	 * List entities by filters and pagination results.
+	 * List entities from db using filters and pagination results.
 	 * @methods
 	 * @param {Context} ctx - Context instance.
-	 * @param {FindManyOptions<Object>?} params - Optional parameters.
+	 * @param {ListParams<Object>?} params - Optional parameters.
 	 *
 	 * @returns {Object} List of found entities and count.
 	 * @memberof TypeORMDbAdapter
 	 */
-	list(ctx: any, params: any): object {
+	list(ctx: any, params: ListParams): object {
 		let countParams = Object.assign({}, params);
 		// Remove pagination params
-		if (countParams && countParams.limit) countParams.limit = null;
-		if (countParams && countParams.offset) countParams.offset = null;
+		if (countParams && countParams.limit) countParams.limit = undefined;
+		if (countParams && countParams.offset) countParams.offset = undefined;
 		if (params.limit == null) {
-			if (this.service.settings.limit > 0 && params.pageSize > this.service.settings.limit)
+			if (this.service.settings.limit > 0 && params.pageSize! > this.service.settings.limit)
 				params.limit = this.service.settings.limit;
 			else params.limit = params.pageSize;
 		}
@@ -511,10 +536,6 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 		delete modifiedCountParams.pageSize;
 		delete modifiedCountParams.page;
 
-		console.log('list params: ', modifiedFindParams);
-		console.log('count params: ', countParams);
-		console.log('params: ', params);
-		console.log('modified modifiedCountParams: ', modifiedCountParams);
 		return all([
 			// Get rows
 			this.find(modifiedFindParams),
@@ -532,14 +553,16 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 					// Page size
 					pageSize: params.pageSize,
 					// Total pages
-					totalPages: Math.floor((res[1] + params.pageSize - 1) / params.pageSize),
+					totalPages: Math.floor(
+						(res[1] + params.pageSize - 1) / Number(params.pageSize),
+					),
 				};
 			});
 		});
 	}
 
 	/**
-	 * Transforms 'idField' into expected db id field.
+	 * Transforms user defined idField into expected db id field.
 	 * @methods
 	 * @param {Object} entity
 	 * @param {String} idField
@@ -550,9 +573,12 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	beforeSaveTransformID(entity: any, idField: string): object {
 		let newEntity = cloneDeep(entity);
 		// gets the idField from the entity
-		const dbIDField = find(this.repository!.metadata.ownColumns, {
-			isPrimary: true,
-		})!.propertyName;
+		const dbIDField =
+			this.opts.type === 'mongodb'
+				? '_id'
+				: find(this.repository!.metadata.ownColumns, {
+						isPrimary: true,
+				  })!.propertyName;
 
 		if (idField !== dbIDField && entity[idField] !== undefined) {
 			newEntity = JSON.parse(
@@ -568,7 +594,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	}
 
 	/**
-	 * Transforms db field into user defined 'idField'
+	 * Transforms db field into user defined idField service property
 	 * @methods
 	 * @param {Object} entity
 	 * @param {String} idField
@@ -606,16 +632,19 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	}
 
 	/**
-	 * Transform idField into the name of the id field in db
+	 * Transform user defined idField service property into the expected id field of db.
 	 * @methods
 	 * @param {any} idField
 	 * @returns {any}
 	 * @memberof TypeORMDbAdapter
 	 */
 	beforeQueryTransformID(idField: any): any {
-		const dbIDField = find(this.repository!.metadata.ownColumns, {
-			isPrimary: true,
-		})!.propertyName;
+		const dbIDField =
+			this.opts.type === 'mongodb'
+				? '_id'
+				: find(this.repository!.metadata.ownColumns, {
+						isPrimary: true,
+				  })!.propertyName;
 		if (idField !== dbIDField) {
 			return dbIDField;
 		}
@@ -634,7 +663,9 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	}
 
 	/**
-	 * Transform the fetched documents
+	 * Transform the fetched documents by converting id to user defind idField,
+	 * filtering the fields according to the fields service property,
+	 * an populating the document with the relations specified in the populate service property.
 	 * @methods
 	 * @param {Context} ctx
 	 * @param {Object} 	params
@@ -644,6 +675,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 */
 	transformDocuments(ctx: any, params: any, docs: any): Promise<Array<any> | object> {
 		let isDoc = false;
+		const userDefinedIDField = this.service.settings.idField;
 		if (!Array.isArray(docs)) {
 			if (isObject(docs)) {
 				isDoc = true;
@@ -658,16 +690,12 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 
 				// Apply idField
 				.then((docs) =>
-					docs.map((doc: any) =>
-						this.afterRetrieveTransformID(doc, this.service.settings.idField),
-					),
+					docs.map((doc: any) => this.afterRetrieveTransformID(doc, userDefinedIDField)),
 				)
 				// Encode IDs
 				.then((docs) =>
 					docs.map((doc: { [x: string]: any }) => {
-						doc[this.service.settings.idField] = this.encodeID(
-							doc[this.service.settings.idField],
-						);
+						doc[userDefinedIDField] = this.encodeID(doc[userDefinedIDField]);
 						return doc;
 					}),
 				)
@@ -821,7 +849,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	/**
 	 * Exclude fields in the entity object. Internal use only, must ensure `fields` is an Array
 	 */
-	_excludeFields(doc: any, fields: any[]) {
+	private _excludeFields(doc: any, fields: any[]) {
 		const res = cloneDeep(doc);
 		fields.forEach((field) => {
 			unset(res, field);
@@ -1037,7 +1065,9 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 
 		// Convert from string to number
 		if (typeof p.limit === 'string') p.limit = Number(p.limit);
+		if (typeof p.take === 'string') p.take = Number(p.take);
 		if (typeof p.offset === 'string') p.offset = Number(p.offset);
+		if (typeof p.skip === 'string') p.skip = Number(p.skip);
 		if (typeof p.page === 'string') p.page = Number(p.page);
 		if (typeof p.pageSize === 'string') p.pageSize = Number(p.pageSize);
 		// Convert from string to POJO
@@ -1050,6 +1080,10 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 		if (typeof p.excludeFields === 'string') p.excludeFields = p.excludeFields.split(/[,\s]+/);
 
 		if (typeof p.populate === 'string') p.populate = p.populate.split(/[,\s]+/);
+
+		if (typeof p.relations === 'string') p.relations = JSON.parse(p.relations);
+
+		if (typeof p.where === 'string') p.where = JSON.parse(p.where); // where array paramater is an or query
 
 		if (typeof p.searchFields === 'string') p.searchFields = p.searchFields.split(/[,\s]+/);
 
@@ -1065,12 +1099,16 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 				p.pageSize = this.settings.maxPageSize;
 
 			// Calculate the limit & offset from page & pageSize
-			p.limit = p.pageSize;
-			p.offset = (p.page - 1) * p.pageSize;
+			if (p.limit) p.limit = p.pageSize;
+			if (p.offset) p.offset = (p.page - 1) * p.pageSize;
+			if (p.take) p.take = p.pageSize;
+			if (p.skip) p.skip = (p.page - 1) * p.pageSize;
 		}
 		// Limit the `limit`
 		if (this.settings.maxLimit > 0 && p.limit > this.settings.maxLimit)
 			p.limit = this.settings.maxLimit;
+		if (this.settings.maxLimit > 0 && p.take > this.settings.maxLimit)
+			p.take = this.settings.maxLimit;
 
 		return p;
 	}
