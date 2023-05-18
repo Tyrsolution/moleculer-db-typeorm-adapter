@@ -571,15 +571,18 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	 * MongoDB Only methods
 	 */
 	/**
+	 * MongoDB Only
 	 * Creates a cursor for a query that can be used to iterate over results from MongoDB.
 	 */
 	createCursor<T = any>(query?: Filter<Entity>): FindCursor<T>;
 	/**
+	 * MongoDB Only
 	 * Creates a cursor for a query that can be used to iterate over results from MongoDB.
 	 * This returns modified version of cursor that transforms each result into Entity model.
 	 */
 	createEntityCursor(query?: Filter<Entity>): FindCursor<Entity>;
 	/**
+	 * MongoDB Only
 	 * Execute an aggregation framework pipeline against the collection.
 	 */
 	aggregate<R = any>(
@@ -587,6 +590,7 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 		options?: AggregateOptions,
 	): AggregationCursor<Entity>;
 	/**
+	 * MongoDB Only
 	 * Execute an aggregation framework pipeline against the collection.
 	 * This returns modified version of cursor that transforms each result into Entity model.
 	 */
@@ -595,6 +599,7 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 		options?: AggregateOptions,
 	): AggregationCursor<Entity>;
 	/**
+	 * MongoDB Only
 	 * Perform a bulkWrite operation without a fluent API.
 	 */
 	bulkWrite(
@@ -602,6 +607,7 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 		options?: BulkWriteOptions,
 	): Promise<BulkWriteResult>;
 	/**
+	 * MongoDB Only
 	 * Creates an index on the db and collection.
 	 */
 	createCollectionIndex(
@@ -609,36 +615,44 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 		options?: CreateIndexesOptions,
 	): Promise<string>;
 	/**
+	 * MongoDB Only
 	 * Creates multiple indexes in the collection, this method is only supported for MongoDB 2.6 or higher.
 	 * Earlier version of MongoDB will throw a command not supported error.
 	 * Index specifications are defined at http://docs.mongodb.org/manual/reference/command/createIndexes/.
 	 */
 	createCollectionIndexes(indexSpecs: IndexDescription[]): Promise<string[]>;
 	/**
+	 * MongoDB Only
 	 * Delete multiple documents on MongoDB.
 	 */
 	deleteMany(query: ObjectLiteral, options?: DeleteOptions): Promise<DeleteResult>;
 	/**
+	 * MongoDB Only
 	 * Delete a document on MongoDB.
 	 */
 	deleteOne(query: ObjectLiteral, options?: DeleteOptions): Promise<DeleteResult>;
 	/**
+	 * MongoDB Only
 	 * The distinct command returns returns a list of distinct values for the given key across a collection.
 	 */
 	distinct(key: string, query: ObjectLiteral, options?: CommandOperationOptions): Promise<any>;
 	/**
+	 * MongoDB Only
 	 * Drops an index from this collection.
 	 */
 	dropCollectionIndex(indexName: string, options?: CommandOperationOptions): Promise<any>;
 	/**
+	 * MongoDB Only
 	 * Drops all indexes from the collection.
 	 */
 	dropCollectionIndexes(): Promise<any>;
 	/**
+	 * MongoDB Only
 	 * Find a document and delete it in one atomic operation, requires a write lock for the duration of the operation.
 	 */
 	findOneAndDelete(query: ObjectLiteral, options?: FindOneAndDeleteOptions): Promise<Document>;
 	/**
+	 * MongoDB Only
 	 * Find a document and replace it in one atomic operation, requires a write lock for the duration of the operation.
 	 */
 	findOneAndReplace(
@@ -647,6 +661,7 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 		options?: FindOneAndReplaceOptions,
 	): Promise<Document>;
 	/**
+	 * MongoDB Only
 	 * Find a document and update it in one atomic operation, requires a write lock for the duration of the operation.
 	 */
 	findOneAndUpdate(
@@ -655,26 +670,32 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 		options?: FindOneAndUpdateOptions,
 	): Promise<Document>;
 	/**
+	 * MongoDB Only
 	 * Retrieve all the indexes on the collection.
 	 */
 	collectionIndexes(): Promise<any>;
 	/**
+	 * MongoDB Only
 	 * Retrieve all the indexes on the collection.
 	 */
 	collectionIndexExists(indexes: string | string[]): Promise<boolean>;
 	/**
+	 * MongoDB Only
 	 * Retrieves this collections index info.
 	 */
 	collectionIndexInformation(options?: { full: boolean }): Promise<any>;
 	/**
+	 * MongoDB Only
 	 * Initiate an In order bulk write operation, operations will be serially executed in the order they are added, creating a new operation for each switch in types.
 	 */
 	initializeOrderedBulkOp(options?: BulkWriteOptions): OrderedBulkOperation;
 	/**
+	 * MongoDB Only
 	 * Initiate a Out of order batch write operation. All operations will be buffered into insert/update/remove commands executed out of order.
 	 */
 	initializeUnorderedBulkOp(options?: BulkWriteOptions): UnorderedBulkOperation;
 	/**
+	 * MongoDB Only
 	 * Inserts an array of documents into MongoDB.
 	 */
 	insertMany(
@@ -682,22 +703,27 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 		options?: BulkWriteOptions,
 	): Promise<InsertManyResult<Document>>;
 	/**
+	 * MongoDB Only
 	 * Inserts a single document into MongoDB.
 	 */
 	insertOne(doc: ObjectLiteral, options?: InsertOneOptions): Promise<InsertOneResult>;
 	/**
+	 * MongoDB Only
 	 * Returns if the collection is a capped collection.
 	 */
 	isCapped(): Promise<any>;
 	/**
+	 * MongoDB Only
 	 * Get the list of all indexes information for the collection.
 	 */
 	listCollectionIndexes(options?: ListIndexesOptions): ListIndexesCursor;
 	/**
+	 * MongoDB Only
 	 * Reindex all indexes on the collection Warning: reIndex is a blocking operation (indexes are rebuilt in the foreground) and will be slow for large collections.
 	 */
 	rename(newName: string, options?: { dropTarget?: boolean }): Promise<Collection<Document>>;
 	/**
+	 * MongoDB Only
 	 * Replace a document on MongoDB.
 	 */
 	replaceOne(
@@ -706,10 +732,12 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 		options?: ReplaceOptions,
 	): Promise<Document | UpdateResult>;
 	/**
+	 * MongoDB Only
 	 * Get all the collection statistics.
 	 */
 	stats(options?: CollStatsOptions): Promise<CollStats>;
 	/**
+	 * MongoDB Only
 	 * Update multiple documents on MongoDB.
 	 */
 	updateMany(
@@ -718,6 +746,7 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 		options?: UpdateOptions,
 	): Promise<Document | UpdateResult>;
 	/**
+	 * MongoDB Only
 	 * Update a single document on MongoDB.
 	 */
 	updateOne(
@@ -1328,15 +1357,18 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	 * MongoDB Only methods
 	 */
 	/**
+	 * MongoDB Only
 	 * Creates a cursor for a query that can be used to iterate over results from MongoDB.
 	 */
 	createCursor<T = any>(query?: Filter<Entity>): FindCursor<T>;
 	/**
+	 * MongoDB Only
 	 * Creates a cursor for a query that can be used to iterate over results from MongoDB.
 	 * This returns modified version of cursor that transforms each result into Entity model.
 	 */
 	createEntityCursor(query?: Filter<Entity>): FindCursor<Entity>;
 	/**
+	 * MongoDB Only
 	 * Execute an aggregation framework pipeline against the collection.
 	 */
 	aggregate<R = any>(
@@ -1344,6 +1376,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 		options?: AggregateOptions,
 	): AggregationCursor<Entity>;
 	/**
+	 * MongoDB Only
 	 * Execute an aggregation framework pipeline against the collection.
 	 * This returns modified version of cursor that transforms each result into Entity model.
 	 */
@@ -1352,6 +1385,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 		options?: AggregateOptions,
 	): AggregationCursor<Entity>;
 	/**
+	 * MongoDB Only
 	 * Perform a bulkWrite operation without a fluent API.
 	 */
 	bulkWrite(
@@ -1359,6 +1393,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 		options?: BulkWriteOptions,
 	): Promise<BulkWriteResult>;
 	/**
+	 * MongoDB Only
 	 * Creates an index on the db and collection.
 	 */
 	createCollectionIndex(
@@ -1366,36 +1401,44 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 		options?: CreateIndexesOptions,
 	): Promise<string>;
 	/**
+	 * MongoDB Only
 	 * Creates multiple indexes in the collection, this method is only supported for MongoDB 2.6 or higher.
 	 * Earlier version of MongoDB will throw a command not supported error.
 	 * Index specifications are defined at http://docs.mongodb.org/manual/reference/command/createIndexes/.
 	 */
 	createCollectionIndexes(indexSpecs: IndexDescription[]): Promise<string[]>;
 	/**
+	 * MongoDB Only
 	 * Delete multiple documents on MongoDB.
 	 */
 	deleteMany(query: ObjectLiteral, options?: DeleteOptions): Promise<DeleteResult>;
 	/**
+	 * MongoDB Only
 	 * Delete a document on MongoDB.
 	 */
 	deleteOne(query: ObjectLiteral, options?: DeleteOptions): Promise<DeleteResult>;
 	/**
+	 * MongoDB Only
 	 * The distinct command returns returns a list of distinct values for the given key across a collection.
 	 */
 	distinct(key: string, query: ObjectLiteral, options?: CommandOperationOptions): Promise<any>;
 	/**
+	 * MongoDB Only
 	 * Drops an index from this collection.
 	 */
 	dropCollectionIndex(indexName: string, options?: CommandOperationOptions): Promise<any>;
 	/**
+	 * MongoDB Only
 	 * Drops all indexes from the collection.
 	 */
 	dropCollectionIndexes(): Promise<any>;
 	/**
+	 * MongoDB Only
 	 * Find a document and delete it in one atomic operation, requires a write lock for the duration of the operation.
 	 */
 	findOneAndDelete(query: ObjectLiteral, options?: FindOneAndDeleteOptions): Promise<Document>;
 	/**
+	 * MongoDB Only
 	 * Find a document and replace it in one atomic operation, requires a write lock for the duration of the operation.
 	 */
 	findOneAndReplace(
@@ -1404,6 +1447,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 		options?: FindOneAndReplaceOptions,
 	): Promise<Document>;
 	/**
+	 * MongoDB Only
 	 * Find a document and update it in one atomic operation, requires a write lock for the duration of the operation.
 	 */
 	findOneAndUpdate(
@@ -1412,26 +1456,32 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 		options?: FindOneAndUpdateOptions,
 	): Promise<Document>;
 	/**
+	 * MongoDB Only
 	 * Retrieve all the indexes on the collection.
 	 */
 	collectionIndexes(): Promise<any>;
 	/**
+	 * MongoDB Only
 	 * Retrieve all the indexes on the collection.
 	 */
 	collectionIndexExists(indexes: string | string[]): Promise<boolean>;
 	/**
+	 * MongoDB Only
 	 * Retrieves this collections index info.
 	 */
 	collectionIndexInformation(options?: { full: boolean }): Promise<any>;
 	/**
+	 * MongoDB Only
 	 * Initiate an In order bulk write operation, operations will be serially executed in the order they are added, creating a new operation for each switch in types.
 	 */
 	initializeOrderedBulkOp(options?: BulkWriteOptions): OrderedBulkOperation;
 	/**
+	 * MongoDB Only
 	 * Initiate a Out of order batch write operation. All operations will be buffered into insert/update/remove commands executed out of order.
 	 */
 	initializeUnorderedBulkOp(options?: BulkWriteOptions): UnorderedBulkOperation;
 	/**
+	 * MongoDB Only
 	 * Inserts an array of documents into MongoDB.
 	 */
 	insertMany(
@@ -1439,22 +1489,27 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 		options?: BulkWriteOptions,
 	): Promise<InsertManyResult<Document>>;
 	/**
+	 * MongoDB Only
 	 * Inserts a single document into MongoDB.
 	 */
 	insertOne(doc: ObjectLiteral, options?: InsertOneOptions): Promise<InsertOneResult>;
 	/**
+	 * MongoDB Only
 	 * Returns if the collection is a capped collection.
 	 */
 	isCapped(): Promise<any>;
 	/**
+	 * MongoDB Only
 	 * Get the list of all indexes information for the collection.
 	 */
 	listCollectionIndexes(options?: ListIndexesOptions): ListIndexesCursor;
 	/**
+	 * MongoDB Only
 	 * Reindex all indexes on the collection Warning: reIndex is a blocking operation (indexes are rebuilt in the foreground) and will be slow for large collections.
 	 */
 	rename(newName: string, options?: { dropTarget?: boolean }): Promise<Collection<Document>>;
 	/**
+	 * MongoDB Only
 	 * Replace a document on MongoDB.
 	 */
 	replaceOne(
@@ -1463,10 +1518,12 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 		options?: ReplaceOptions,
 	): Promise<Document | UpdateResult>;
 	/**
+	 * MongoDB Only
 	 * Get all the collection statistics.
 	 */
 	stats(options?: CollStatsOptions): Promise<CollStats>;
 	/**
+	 * MongoDB Only
 	 * Update multiple documents on MongoDB.
 	 */
 	updateMany(
@@ -1475,6 +1532,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 		options?: UpdateOptions,
 	): Promise<Document | UpdateResult>;
 	/**
+	 * MongoDB Only
 	 * Update a single document on MongoDB.
 	 */
 	updateOne(
