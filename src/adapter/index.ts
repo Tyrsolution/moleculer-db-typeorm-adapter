@@ -515,15 +515,19 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 			if (countParams.offset) {
 				delete countParams.offset;
 			}
-			modifiedCountParams = countParams;
+			if (params.offset !== 0) {
+				modifiedCountParams = countParams;
+			}
 		}
-		if (params.limit || params.offset) {
-			modifiedCountParams = JSON.parse(
-				replace(JSON.stringify(countParams), '"limit":', '"take":').replace(
-					'"offset":',
-					'"skip":',
-				),
-			);
+		if (params.limit && params.offset) {
+			if (params.offset !== 0) {
+				modifiedCountParams = JSON.parse(
+					replace(JSON.stringify(countParams), '"limit":', '"take":').replace(
+						'"offset":',
+						'"skip":',
+					),
+				);
+			}
 		}
 		if (has(modifiedCountParams, 'relations')) {
 			delete modifiedCountParams.relations;
@@ -533,15 +537,18 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 		}
 		delete modifiedFindParams.pageSize;
 		delete modifiedFindParams.page;
-		delete modifiedCountParams.pageSize;
-		delete modifiedCountParams.page;
+		if (modifiedCountParams) {
+			delete modifiedCountParams.pageSize;
+			delete modifiedCountParams.page;
+		}
 
 		return all([
 			// Get rows
-			this.find(modifiedFindParams),
+			this['find'](modifiedFindParams),
 			// Get count of all rows
-			this.count(modifiedCountParams),
+			this['count'](modifiedCountParams),
 		]).then(async (res) => {
+			console.log('list count: ', res[1]);
 			return await this.transformDocuments(ctx, params, res[0]).then((docs: any) => {
 				return {
 					// Rows
