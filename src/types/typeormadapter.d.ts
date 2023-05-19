@@ -803,6 +803,22 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	 */
 	findByIds<T extends Entity>(key: string | undefined | null, ids: any[]): Promise<T | undefined>;
 	/**
+	 * Gets multiple items by id.
+	 * Can use find options, no where clause.
+	 * @methods
+	 * @param {Partial<T>} key - primary column name
+	 * @param {Array<string> | Array<number>} ids - ids of entity
+	 * @param {Object} findOptions - find options, like relations, order, etc. No where clause
+	 * @returns {Promise<T | undefined>}
+	 * @memberof TypeORMDbAdapter
+	 *
+	 */
+	findByIdsWO<T extends Entity>(
+		key: string | undefined | null,
+		ids: any[],
+		findOptions?: FindOneOptions<T>,
+	): Promise<T | undefined>;
+	/**
 	 * List entities by filters and pagination results.
 	 *
 	 * @methods
@@ -1622,6 +1638,22 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	 *
 	 */
 	findByIds<T extends Entity>(key: string | undefined | null, ids: any[]): Promise<T | undefined>;
+	/**
+	 * Gets multiple items by id.
+	 * Can use find options, no where clause.
+	 * @methods
+	 * @param {Partial<T>} key - primary column name
+	 * @param {Array<string> | Array<number>} ids - ids of entity
+	 * @param {Object} findOptions - find options, like relations, order, etc. No where clause
+	 * @returns {Promise<T | undefined>}
+	 * @memberof TypeORMDbAdapter
+	 *
+	 */
+	findByIdsWO<T extends Entity>(
+		key: string | undefined | null,
+		ids: any[],
+		findOptions?: FindOneOptions<T>,
+	): Promise<T | undefined>;
 	/**
 	 * List entities by filters and pagination results.
 	 *

@@ -402,17 +402,17 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 		id: string | number,
 		findOptions?: FindOneOptions<T>,
 	): Promise<T | undefined> {
-		const dbID = this.beforeQueryTransformID(key);
+		const transformId = this.beforeQueryTransformID(key);
 		const entity =
 			this.opts.type !== 'mongodb'
 				? await this['findOneOrFail']({
-						where: { [dbID]: In([id]) },
+						where: { [transformId]: In([id]) },
 						...findOptions,
 				  })
 				: await this['findOneOrFail']({
-						where: { [dbID]: { $in: [id] } },
+						where: { [transformId]: { $in: [id] } },
 						...findOptions,
-				  });
+				  }); // needed for mongodb
 		return this.afterRetrieveTransformID(entity, this.service.settings.idField) as
 			| T
 			| undefined;
@@ -431,11 +431,11 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 		key: string | undefined | null = this.service.settings.idField,
 		id: string | number,
 	): Promise<T | undefined> {
-		const dbID = this.beforeQueryTransformID(key);
+		const transformId = this.beforeQueryTransformID(key);
 		const entity =
 			this.opts.type !== 'mongodb'
-				? await this['findOneByOrFail']({ [dbID]: In([id]) })
-				: await this['findOneByOrFail']({ [dbID]: In([id]) });
+				? await this['findOneByOrFail']({ [transformId]: In([id]) })
+				: await this['findOneByOrFail']({ where: { [transformId]: { $in: [id] } } }); // needed for mongodb
 		return this.afterRetrieveTransformID(entity, this.service.settings.idField) as
 			| T
 			| undefined;
@@ -455,11 +455,56 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 		key: string | undefined | null = this.service.settings.idField,
 		ids: any[],
 	): Promise<T | undefined> {
-		const dbID = this.beforeQueryTransformID(key);
-		const entity = await this['findBy']({ [dbID]: In([...ids]) });
+		const transformId = this.beforeQueryTransformID(key);
+		const entity =
+			this.opts.type !== 'mongodb'
+				? await this['findBy']({ [transformId]: In([...ids]) })
+				: await this['find']({ where: { [transformId]: { $in: [...ids] } } }); // needed for mongodb. FindBy is having issues: https://github.com/typeorm/typeorm/issues/8889
 		return this.afterRetrieveTransformID(entity, this.service.settings.idField) as
 			| T
 			| undefined;
+	}
+
+	/**
+	 * Gets multiple items by id.
+	 * Can use find options, no where clause.
+	 * @methods
+	 * @param {Partial<T>} key - primary column name
+	 * @param {Array<string> | Array<number>} ids - ids of entity
+	 * @param {Object} findOptions - find options, like relations, order, etc. No where clause
+	 * @returns {Promise<T | undefined>}
+	 * @memberof TypeORMDbAdapter
+	 *
+	 */
+	async findByIdsWO<T extends Entity>(
+		key: string | undefined | null = this.service.settings.idField,
+		ids: any[],
+		findOptions?: FindOneOptions<T>,
+	): Promise<T | undefined> {
+		const transformId = this.beforeQueryTransformID(key);
+		const entity =
+			this.opts.type !== 'mongodb'
+				? await this['find']({ where: { [transformId]: In([...ids]) }, ...findOptions })
+				: await this['find']({
+						where: { [transformId]: { $in: [...ids] }, ...findOptions },
+				  }); // needed for mongodb. FindBy is having issues: https://github.com/typeorm/typeorm/issues/8889
+		return this.afterRetrieveTransformID(entity, this.service.settings.idField) as
+			| T
+			| undefined;
+	}
+
+	/**
+	 * Update an entity by ID
+	 * @methods
+	 * @param {any} id - ID of record to be updated
+	 * @param {Object} update - Object with update data
+	 * @returns {Promise} - Updated record
+	 * @memberof TypeORMDbAdapter
+	 */
+	async updateById(id: any, update: any): Promise<any> {
+		const transformId: any = this.beforeQueryTransformID(id);
+		const entity = await this['update']({ [transformId]: id }, update);
+		return this.afterRetrieveTransformID(entity, this.service.settings.idField);
 	}
 
 	/**
@@ -467,12 +512,12 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 * @methods
 	 * @param {Context} ctx - Context instance.
 	 * @param {ListParams<Object>?} params - Optional parameters.
-	 *
 	 * @returns {Object} List of found entities and count.
 	 * @memberof TypeORMDbAdapter
 	 */
 	list(ctx: any, params: ListParams): object {
-		let countParams = Object.assign({}, params);
+		const sanatizedParams = this.sanitizeParams(ctx, params);
+		let countParams = Object.assign({}, sanatizedParams);
 		// Remove pagination params
 		if (countParams && countParams.limit) countParams.limit = undefined;
 		if (countParams && countParams.offset) countParams.offset = undefined;
@@ -571,10 +616,9 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	/**
 	 * Transforms user defined idField into expected db id field.
 	 * @methods
-	 * @param {Object} entity
-	 * @param {String} idField
-	 * @memberof MemoryDbAdapter
-	 * @returns {Object} Modified entity
+	 * @param {Object} entity - Record to be saved
+	 * @param {String} idField - user defined service idField
+	 * @returns {Object} - Modified entity
 	 * @memberof TypeORMDbAdapter
 	 */
 	beforeSaveTransformID(entity: any, idField: string): object {
@@ -603,10 +647,9 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	/**
 	 * Transforms db field into user defined idField service property
 	 * @methods
-	 * @param {Object} entity
-	 * @param {String} idField
-	 * @memberof MemoryDbAdapter
-	 * @returns {Object} Modified entity
+	 * @param {Object} entity = Record retrieved from db
+	 * @param {String} idField - user defined service idField
+	 * @returns {Object} - Modified entity
 	 * @memberof TypeORMDbAdapter
 	 */
 	afterRetrieveTransformID(entity: any, idField: string): Object {
@@ -641,8 +684,8 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	/**
 	 * Transform user defined idField service property into the expected id field of db.
 	 * @methods
-	 * @param {any} idField
-	 * @returns {any}
+	 * @param {any} idField - user defined service idField
+	 * @returns {Object} - Record to be saved
 	 * @memberof TypeORMDbAdapter
 	 */
 	beforeQueryTransformID(idField: any): any {
@@ -672,12 +715,12 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	/**
 	 * Transform the fetched documents by converting id to user defind idField,
 	 * filtering the fields according to the fields service property,
-	 * an populating the document with the relations specified in the populate service property.
+	 * and populating the document with the relations specified in the populate service property.
 	 * @methods
-	 * @param {Context} ctx
-	 * @param {Object} 	params
-	 * @param {Array|Object} docs
-	 * @returns {Array|Object}
+	 * @param {Context} ctx - Context of the request
+	 * @param {Object} 	params - Params of the request
+	 * @param {Array|Object} docs - Records to be transformed
+	 * @returns {Array|Object} - Transformed records
 	 * @memberof TypeORMDbAdapter
 	 */
 	transformDocuments(ctx: any, params: any, docs: any): Promise<Array<any> | object> {
@@ -818,9 +861,9 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	/**
 	 * Filter fields in the entity object
 	 * @methods
-	 * @param {Object} 	doc
-	 * @param {Array<String>} 	fields	Filter properties of model.
-	 * @returns	{Object}
+	 * @param {Object} doc - Record to be filtered.
+	 * @param {Array<String>} fields - Filter properties of model.
+	 * @returns	{Object} - Filtered record
 	 * @memberof TypeORMDbAdapter
 	 */
 	filterFields(doc: any, fields: any[]): object {
@@ -840,9 +883,9 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	/**
 	 * Exclude fields in the entity object
 	 * @methods
-	 * @param {Object} 	doc
-	 * @param {Array<String>} 	fields	Exclude properties of model.
-	 * @returns	{Object}
+	 * @param {Object} doc - Record to be filtered.
+	 * @param {Array<String>} fields - Exclude properties of model.
+	 * @returns	{Object} - Recored without excluded fields
 	 * @memberof TypeORMDbAdapter
 	 */
 	excludeFields(doc: any, fields: string | any[]): object {
@@ -865,12 +908,15 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	}
 
 	/**
-	 * Populate documents.
+	 * Populate documents for relations.
+	 * Used when relations between records between different databases can't be done.
+	 * Populates the retreived record by calling service action with the `id` of the relation.
+	 * Does not update related document at this time
 	 * @methods
-	 * @param {Context} 		ctx
-	 * @param {Array|Object} 	docs
-	 * @param {Array?}			populateFields
-	 * @returns	{Promise}
+	 * @param {Context} ctx - Request context
+	 * @param {Array|Object} docs - Records to be populated
+	 * @param {Array?} populateFields - Fields to be populated
+	 * @returns	{Promise} - Record with populated fields of relation
 	 * @memberof TypeORMDbAdapter
 	 */
 	populateDocs(ctx: any, docs: any, populateFields?: any[]): Promise<any> {
@@ -977,9 +1023,10 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 
 	/**
 	 * Validate an entity by validator.
+	 * Uses the `entityValidator` setting. If no validator function is supplied, returns record.
 	 * @methods
-	 * @param {Object} entity
-	 * @returns {Promise}
+	 * @param {Object} entity - Record to be validated
+	 * @returns {Promise} - Validated record or unvalitaded record if no validator function is supplied.
 	 * @memberof TypeORMDbAdapter
 	 */
 	validateEntity(entity: any): Promise<any> {
@@ -994,8 +1041,8 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	/**
 	 * Convert DB entity to JSON object
 	 * @methods
-	 * @param {any} entity
-	 * @returns {Object}
+	 * @param {any} entity - Record to be converted
+	 * @returns {Object} - JSON object of record
 	 * @memberof TypeORMDbAdapter
 	 */
 	entityToObject(entity: any): object {
@@ -1003,10 +1050,10 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	}
 
 	/**
-	 * Authorize the required field list. Remove fields which is not exist in the `this.service.settings.fields`
+	 * Authorize the required field list. Remove fields which does not exist in the `this.service.settings.fields`
 	 * @methods
-	 * @param {Array} askedFields
-	 * @returns {Array}
+	 * @param {Array} askedFields - List of fields to be authorized
+	 * @returns {Array} - Authorized list of fields
 	 * @memberof TypeORMDbAdapter
 	 */
 	authorizeFields(askedFields: any[]): Array<any> {
@@ -1046,26 +1093,14 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	}
 
 	/**
-	 * Update an entity by ID
-	 * @methods
-	 * @param {any} id
-	 * @param {Object} update
-	 * @returns {Promise}
-	 * @memberof TypeORMDbAdapter
-	 */
-	async updateById(id: any, update: any): Promise<any> {
-		const entity = await this['update']({ id: id }, update);
-		return this.afterRetrieveTransformID(entity, this.service.settings.idField);
-	}
-
-	/**
 	 * Sanitize context parameters at `find` action.
 	 *
 	 * @methods
 	 *
-	 * @param {Context} ctx
-	 * @param {Object} params
-	 * @returns {Object}
+	 * @param {Context} ctx - Request context
+	 * @param {Object} params - Request parameters
+	 * @returns {Object} - Sanitized parameters
+	 * @memberof TypeORMDbAdapter
 	 */
 	sanitizeParams(ctx: any, params: any) {
 		let p = Object.assign({}, params);
@@ -1090,20 +1125,23 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 
 		if (typeof p.relations === 'string') p.relations = JSON.parse(p.relations);
 
-		if (typeof p.where === 'string') p.where = JSON.parse(p.where); // where array paramater is an or query
+		if (typeof p.where === 'string') p.where = JSON.parse(p.where); // where array paramater is an object or query
 
 		if (typeof p.searchFields === 'string') p.searchFields = p.searchFields.split(/[,\s]+/);
 
 		if (ctx.action.name.endsWith('.list')) {
 			// Default `pageSize`
-			if (!p.pageSize) p.pageSize = this.settings.pageSize;
+			if (!p.pageSize) p.pageSize = this.service.settings.pageSize;
 
 			// Default `page`
 			if (!p.page) p.page = 1;
 
 			// Limit the `pageSize`
-			if (this.settings.maxPageSize > 0 && p.pageSize > this.settings.maxPageSize)
-				p.pageSize = this.settings.maxPageSize;
+			if (
+				this.service.settings.maxPageSize > 0 &&
+				p.pageSize > this.service.settings.maxPageSize
+			)
+				p.pageSize = this.service.settings.maxPageSize;
 
 			// Calculate the limit & offset from page & pageSize
 			if (p.limit) p.limit = p.pageSize;
@@ -1112,10 +1150,10 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 			if (p.skip) p.skip = (p.page - 1) * p.pageSize;
 		}
 		// Limit the `limit`
-		if (this.settings.maxLimit > 0 && p.limit > this.settings.maxLimit)
-			p.limit = this.settings.maxLimit;
-		if (this.settings.maxLimit > 0 && p.take > this.settings.maxLimit)
-			p.take = this.settings.maxLimit;
+		if (this.service.settings.maxLimit > 0 && p.limit > this.service.settings.maxLimit)
+			p.limit = this.service.settings.maxLimit;
+		if (this.service.settings.maxLimit > 0 && p.take > this.service.settings.maxLimit)
+			p.take = this.service.settings.maxLimit;
 
 		return p;
 	}
