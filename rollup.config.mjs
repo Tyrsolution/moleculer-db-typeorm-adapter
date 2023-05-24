@@ -1,8 +1,10 @@
 import esbuild from 'rollup-plugin-esbuild';
 import autoExternal from 'rollup-plugin-auto-external';
-import { nodeResolve } from '@rollup/plugin-node-resolve';
 import pkg from './package.json' assert { type: 'json' };
 import dtsBundle from 'rollup-plugin-dts-bundle';
+import commonjs from '@rollup/plugin-commonjs';
+import json from '@rollup/plugin-json';
+import { uglify } from 'rollup-plugin-uglify';
 
 export default () => {
 	const mainInput = {
@@ -14,6 +16,8 @@ export default () => {
 			file: pkg.main,
 		},
 		plugins: [
+			json(),
+			commonjs(),
 			autoExternal({
 				builtins: true,
 				peerDependencies: true,
@@ -23,7 +27,6 @@ export default () => {
 				minify: false,
 				target: 'esnext',
 			}),
-			nodeResolve(),
 			dtsBundle({
 				bundle: {
 					name: '@tyrsolutions/moleculer-db-typeorm-adapter',
@@ -33,6 +36,7 @@ export default () => {
 					// Other 'dts-bundle' package options.
 				},
 			}),
+			process.env.NODE_ENV === 'release' && uglify(),
 		],
 	};
 	const esmInput = {

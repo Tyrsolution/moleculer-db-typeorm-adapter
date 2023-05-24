@@ -19,13 +19,14 @@ import {
 	isObject,
 	isString,
 	isUndefined,
+	map,
 	replace,
 	set,
 	uniq,
 	unset,
 } from 'lodash';
 import { all, method, resolve } from 'bluebird';
-import { Service, ServiceBroker, Errors } from 'moleculer';
+import { Service, ServiceBroker, Errors, Context } from 'moleculer';
 import {
 	DataSource,
 	DataSourceOptions,
@@ -36,9 +37,11 @@ import {
 	FindOneOptions,
 	In,
 	MongoEntityManager,
+	FindManyOptions,
 } from 'typeorm';
 import ConnectionManager from './connectionManager';
 import { ListParams } from '../types/typeormadapter';
+import { ObjectId } from 'mongodb';
 // const type = require('typeof-items');
 
 /**
@@ -271,6 +274,9 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 				'findOneAndDelete',
 				'findOneAndReplace',
 				'findOneAndUpdate',
+				'geoHaystackSearch',
+				'geoNear',
+				'group',
 				'collectionIndexes',
 				'collectionIndexExists',
 				'collectionIndexInformation',
@@ -280,6 +286,8 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 				'insertOne',
 				'isCapped',
 				'listCollectionIndexes',
+				'parallelCollectionScan',
+				'reIndex',
 				'rename',
 				'replaceOne',
 				'stats',
@@ -309,9 +317,12 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 						findByIdWO: this.findByIdWO,
 						findById: this.findById,
 						findByIds: this.findByIds,
+						findByIdsWO: this.findByIdsWO,
 						list: this.list,
 						encodeID: this.encodeID,
 						decodeID: this.decodeID,
+						toMongoObjectId: this.toMongoObjectId,
+						fromMongoObjectId: this.fromMongoObjectId,
 						transformDocuments: this.transformDocuments,
 						beforeEntityChange: this.beforeEntityChange,
 						entityChanged: this.entityChanged,
@@ -389,28 +400,42 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	// -------------------------------------------------------------------------
 
 	/**
-	 * Gets item by id. Can use find options, no where clause.
+	 * Gets item by id(s). Can use find options, no where clause.
 	 * @methods
-	 * @param {Partial<T>} key - primary column name
-	 * @param {string | number} id - id of entity
+	 * @param {Partial<T>} key - primary db id column name
+	 * @param {string | number | string[] | number[]} id - id(s) of entity
 	 * @param {Object} findOptions - find options, like relations, order, etc. No where clause
 	 * @returns {Promise<T | undefined>}
 	 * @memberof TypeORMDbAdapter
 	 */
 	async findByIdWO<T extends Entity>(
 		key: string | undefined | null = this.service.settings.idField,
-		id: string | number,
-		findOptions?: FindOneOptions<T>,
+		id: string | number | string[] | number[],
+		findOptions?: FindOneOptions<T> | FindManyOptions<T>,
 	): Promise<T | undefined> {
 		const transformId = this.beforeQueryTransformID(key);
 		const entity =
 			this.opts.type !== 'mongodb'
-				? await this['findOneOrFail']({
-						where: { [transformId]: In([id]) },
-						...findOptions,
+				? isArray(id)
+					? await this['find']({ where: { [transformId]: In([...id]) }, ...findOptions })
+					: await this['findOneOrFail']({
+							where: { [transformId]: In([id]) },
+							...findOptions,
+					  })
+				: isArray(id)
+				? await this['find']({
+						where: {
+							[transformId]: {
+								$in: [
+									...map(id, (recordId: any) => this.toMongoObjectId(recordId)),
+								],
+								// $in: [...[id.forEach((recordId: any) => new ObjectId(recordId))]],
+							},
+							...findOptions,
+						},
 				  })
 				: await this['findOneOrFail']({
-						where: { [transformId]: { $in: [id] } },
+						where: { [transformId]: { $in: [this.toMongoObjectId(id)] } },
 						...findOptions,
 				  }); // needed for mongodb
 		return this.afterRetrieveTransformID(entity, this.service.settings.idField) as
@@ -419,23 +444,37 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	}
 
 	/**
-	 * Gets item by id. No find options
+	 * Gets item by id(s). No find options can be provided
 	 * @methods
-	 * @param {Partial<T>} key - primary column name
-	 * @param {string | number} id - id of entity
+	 * @param {Partial<T>} key - primary db id column name
+	 * @param {string | number | string[] | number[]} id - id(s) of entity
 	 * @returns {Promise<T | undefined>}
 	 * @memberof TypeORMDbAdapter
 	 *
 	 */
 	async findById<T extends Entity>(
 		key: string | undefined | null = this.service.settings.idField,
-		id: string | number,
+		id: string | number | string[] | number[],
 	): Promise<T | undefined> {
 		const transformId = this.beforeQueryTransformID(key);
 		const entity =
 			this.opts.type !== 'mongodb'
-				? await this['findOneByOrFail']({ [transformId]: In([id]) })
-				: await this['findOneByOrFail']({ where: { [transformId]: { $in: [id] } } }); // needed for mongodb
+				? isArray(id)
+					? await this['findBy']({ [transformId]: In([...id]) })
+					: await this['findOneByOrFail']({ [transformId]: In([id]) })
+				: isArray(id)
+				? await this['find']({
+						where: {
+							[transformId]: {
+								$in: [
+									...map(id, (recordId: any) => this.toMongoObjectId(recordId)),
+								],
+							},
+						},
+				  })
+				: await this['findOneByOrFail']({
+						where: { [transformId]: { $in: [this.toMongoObjectId(id)] } },
+				  }); // needed for mongodb
 		return this.afterRetrieveTransformID(entity, this.service.settings.idField) as
 			| T
 			| undefined;
@@ -445,11 +484,11 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 * Gets multiple items by id.
 	 * No find options
 	 * @methods
-	 * @param {Partial<T>} key - primary column name
+	 * @param {Partial<T>} key - primary db id column name
 	 * @param {Array<string> | Array<number>} ids - ids of entity
 	 * @returns {Promise<T | undefined>}
 	 * @memberof TypeORMDbAdapter
-	 *
+	 * @deprecated - use findById instead. It now supports multiple ids
 	 */
 	async findByIds<T extends Entity>(
 		key: string | undefined | null = this.service.settings.idField,
@@ -459,7 +498,15 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 		const entity =
 			this.opts.type !== 'mongodb'
 				? await this['findBy']({ [transformId]: In([...ids]) })
-				: await this['find']({ where: { [transformId]: { $in: [...ids] } } }); // needed for mongodb. FindBy is having issues: https://github.com/typeorm/typeorm/issues/8889
+				: await this['find']({
+						where: {
+							[transformId]: {
+								$in: [
+									...map(ids, (recordId: any) => this.toMongoObjectId(recordId)),
+								],
+							},
+						},
+				  }); // needed for mongodb. FindBy is having issues: https://github.com/typeorm/typeorm/issues/8889
 		return this.afterRetrieveTransformID(entity, this.service.settings.idField) as
 			| T
 			| undefined;
@@ -469,24 +516,32 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 * Gets multiple items by id.
 	 * Can use find options, no where clause.
 	 * @methods
-	 * @param {Partial<T>} key - primary column name
+	 * @param {Partial<T>} key - primary db id column name
 	 * @param {Array<string> | Array<number>} ids - ids of entity
 	 * @param {Object} findOptions - find options, like relations, order, etc. No where clause
 	 * @returns {Promise<T | undefined>}
 	 * @memberof TypeORMDbAdapter
+	 * @deprecated - use findByIdWO instead. It now supports multiple ids
 	 *
 	 */
 	async findByIdsWO<T extends Entity>(
 		key: string | undefined | null = this.service.settings.idField,
 		ids: any[],
-		findOptions?: FindOneOptions<T>,
+		findOptions?: FindManyOptions<T>,
 	): Promise<T | undefined> {
 		const transformId = this.beforeQueryTransformID(key);
 		const entity =
 			this.opts.type !== 'mongodb'
 				? await this['find']({ where: { [transformId]: In([...ids]) }, ...findOptions })
 				: await this['find']({
-						where: { [transformId]: { $in: [...ids] }, ...findOptions },
+						where: {
+							[transformId]: {
+								$in: [
+									...map(ids, (recordId: any) => this.toMongoObjectId(recordId)),
+								],
+							},
+							...findOptions,
+						},
 				  }); // needed for mongodb. FindBy is having issues: https://github.com/typeorm/typeorm/issues/8889
 		return this.afterRetrieveTransformID(entity, this.service.settings.idField) as
 			| T
@@ -503,7 +558,10 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 */
 	async updateById(id: any, update: any): Promise<any> {
 		const transformId: any = this.beforeQueryTransformID(id);
-		const entity = await this['update']({ [transformId]: id }, update);
+		const entity =
+			this.opts.type !== 'mongodb'
+				? await this['update']({ [transformId]: id }, update)
+				: await this['update']({ [transformId]: this.toMongoObjectId(id) }, update);
 		return this.afterRetrieveTransformID(entity, this.service.settings.idField);
 	}
 
@@ -593,7 +651,6 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 			// Get count of all rows
 			this['count'](modifiedCountParams),
 		]).then(async (res) => {
-			console.log('list count: ', res[1]);
 			return await this.transformDocuments(ctx, params, res[0]).then((docs: any) => {
 				return {
 					// Rows
@@ -614,7 +671,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	}
 
 	/**
-	 * Transforms user defined idField into expected db id field.
+	 * Transforms user defined idField into expected db id field name.
 	 * @methods
 	 * @param {Object} entity - Record to be saved
 	 * @param {String} idField - user defined service idField
@@ -645,7 +702,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	}
 
 	/**
-	 * Transforms db field into user defined idField service property
+	 * Transforms db field name into user defined idField service property
 	 * @methods
 	 * @param {Object} entity = Record retrieved from db
 	 * @param {String} idField - user defined service idField
@@ -679,6 +736,28 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 */
 	encodeID(id: any): any {
 		return id;
+	}
+
+	/**
+	 * Convert id to mongodb ObjectId.
+	 * @methods
+	 * @param {any} id
+	 * @returns {any}
+	 * @memberof TypeORMDbAdapter
+	 */
+	toMongoObjectId(id: any): ObjectId {
+		return new ObjectId(id);
+	}
+
+	/**
+	 * Convert mongodb ObjectId to string.
+	 * @methods
+	 * @param {any} id
+	 * @returns {any}
+	 * @memberof TypeORMDbAdapter
+	 */
+	fromMongoObjectId(id: any): string {
+		return id.toString();
 	}
 
 	/**

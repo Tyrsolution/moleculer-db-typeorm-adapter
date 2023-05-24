@@ -38,7 +38,6 @@ import {
 	InsertOneOptions,
 	InsertOneResult,
 	InsertResult,
-	JoinOptions,
 	ListIndexesCursor,
 	ListIndexesOptions,
 	ObjectId,
@@ -767,7 +766,7 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	 * Gets item by id. Can use find options
 	 *
 	 * @methods
-	 * @param {Partial<T>} key - primary column name
+	 * @param {Partial<T>} key - primary db id column name
 	 * @param {string | number} id - id of entity
 	 * @param {Object} findOptions - find options, like relations, order, etc. No where clause
 	 * @returns {Promise<T | undefined>}
@@ -775,28 +774,28 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	 */
 	findByIdWO<T extends Entity>(
 		key: string | undefined | null,
-		id: string | number,
-		findOptions?: FindOneOptions<T>,
+		id: string | number | string[] | number[],
+		findOptions?: FindOneOptions<T> | FindManyOptions<T>,
 	): Promise<T | undefined>;
 
 	/**
 	 * Gets item by id. No find options
 	 *
 	 * @methods
-	 * @param {Partial<T>} key - primary column name
+	 * @param {Partial<T>} key - primary db id column name
 	 * @param {string | number} id - id of entity
 	 * @returns {Promise<T | undefined>}
 	 *
 	 */
 	findById<T extends Entity>(
 		key: string | undefined | null,
-		id: string | number,
+		id: string | number | string[] | number[],
 	): Promise<T | undefined>;
 	/**
 	 * Gets items by id.
 	 *
 	 * @methods
-	 * @param {Partial<T>} key - primary column name
+	 * @param {Partial<T>} key - primary db id column name
 	 * @param {Array<string> | Array<number>} ids - ids of entity
 	 * @returns {Promise<T | undefined>}
 	 *
@@ -806,11 +805,12 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	 * Gets multiple items by id.
 	 * Can use find options, no where clause.
 	 * @methods
-	 * @param {Partial<T>} key - primary column name
+	 * @param {Partial<T>} key - primary db id column name
 	 * @param {Array<string> | Array<number>} ids - ids of entity
 	 * @param {Object} findOptions - find options, like relations, order, etc. No where clause
 	 * @returns {Promise<T | undefined>}
 	 * @memberof TypeORMDbAdapter
+	 * @deprecated - use findByIdWO instead. It now supports multiple ids
 	 *
 	 */
 	findByIdsWO<T extends Entity>(
@@ -856,6 +856,24 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	 * @returns {any}
 	 */
 	decodeID(id: any): any;
+
+	/**
+	 * Convert id to mongodb ObjectId.
+	 * @methods
+	 * @param {any} id
+	 * @returns {any}
+	 * @memberof TypeORMDbAdapter
+	 */
+	toMongoObjectId(id: any): ObjectId;
+
+	/**
+	 * Convert mongodb ObjectId to string.
+	 * @methods
+	 * @param {any} id
+	 * @returns {any}
+	 * @memberof TypeORMDbAdapter
+	 */
+	fromMongoObjectId(id: any): string;
 
 	/**
 	 * Transform the fetched documents
@@ -1603,38 +1621,39 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	 * Gets item by id. Can use find options
 	 *
 	 * @methods
-	 * @param {Partial<T>} key - primary column name
-	 * @param {string | number} id - id of entity
+	 * @param {Partial<T>} key - primary db id column name
+	 * @param {string | number | string[] | number[]} id - id(d) of entity
 	 * @param {Object} findOptions - find options, like relations, order, etc. No where clause
 	 * @returns {Promise<T | undefined>}
 	 *
 	 */
 	findByIdWO<T extends Entity>(
 		key: string | undefined | null,
-		id: string | number,
-		findOptions?: FindOneOptions<T>,
+		id: string | number | string[] | number[],
+		findOptions?: FindOneOptions<T> | FindManyOptions<T>,
 	): Promise<T | undefined>;
 
 	/**
 	 * Gets item by id. No find options
 	 *
 	 * @methods
-	 * @param {Partial<T>} key - primary column name
-	 * @param {string | number} id - id of entity
+	 * @param {Partial<T>} key - primary db id column name
+	 * @param {string | number | string[] | number[]} id - id(s) of entity
 	 * @returns {Promise<T | undefined>}
 	 *
 	 */
 	findById<T extends Entity>(
 		key: string | undefined | null,
-		id: string | number,
+		id: string | number | string[] | number[],
 	): Promise<T | undefined>;
 	/**
 	 * Gets items by id.
 	 *
 	 * @methods
-	 * @param {Partial<T>} key - primary column name
+	 * @param {Partial<T>} key - primary db id column name
 	 * @param {Array<string> | Array<number>} ids - ids of entity
 	 * @returns {Promise<T | undefined>}
+	 * @deprecated - use findById instead. It now supports multiple ids
 	 *
 	 */
 	findByIds<T extends Entity>(key: string | undefined | null, ids: any[]): Promise<T | undefined>;
@@ -1642,11 +1661,12 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	 * Gets multiple items by id.
 	 * Can use find options, no where clause.
 	 * @methods
-	 * @param {Partial<T>} key - primary column name
+	 * @param {Partial<T>} key - primary db id column name
 	 * @param {Array<string> | Array<number>} ids - ids of entity
 	 * @param {Object} findOptions - find options, like relations, order, etc. No where clause
 	 * @returns {Promise<T | undefined>}
 	 * @memberof TypeORMDbAdapter
+	 * @deprecated - use findByIdWO instead. It now supports multiple ids
 	 *
 	 */
 	findByIdsWO<T extends Entity>(
@@ -1692,6 +1712,24 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	 * @returns {any}
 	 */
 	decodeID(id: any): any;
+
+	/**
+	 * Convert id to mongodb ObjectId.
+	 * @methods
+	 * @param {any} id
+	 * @returns {any}
+	 * @memberof TypeORMDbAdapter
+	 */
+	toMongoObjectId(id: any): ObjectId;
+
+	/**
+	 * Convert mongodb ObjectId to string.
+	 * @methods
+	 * @param {any} id
+	 * @returns {any}
+	 * @memberof TypeORMDbAdapter
+	 */
+	fromMongoObjectId(id: any): string;
 
 	/**
 	 * Transform the fetched documents

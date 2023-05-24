@@ -17,7 +17,8 @@
 		"deps": "npm-check -u",
 		"coverall": "cat ./coverage/lcov.info | ./node_modules/coveralls/bin/coveralls.js",
 		"postversion": "git push && git push --follow-tags",
-		"build": "yarn build:clean && run-p build:dist",
+		"pre-release": "yarn build:clean && run-p build:dist",
+		"build": "yarn build:clean && set NODE_ENV=release&& run-p build:dist",
 		"build:clean": "rimraf dist bin",
 		"build:dist": "rollup -c",
 		"build:dts": "dts-bundle-generator -o dist/index.d.ts src/index.ts",
@@ -35,12 +36,12 @@
 	},
 	"author": "Tyr Solutions",
 	"license": "MIT",
-	"peerDependencies": {
-		"moleculer": "^0.14.0"
-	},
+	"peerDependencies": {},
 	"devDependencies": {
 		"@ourparentcenter/moleculer-decorators-extended": "^2.0.0",
-		"@rollup/plugin-node-resolve": "^15.0.2",
+		"@rollup/plugin-auto-install": "^3.0.4",
+		"@rollup/plugin-commonjs": "^25.0.0",
+		"@rollup/plugin-json": "^6.0.0",
 		"@rollup/plugin-typescript": "^11.1.1",
 		"@types/bluebird": "^3.5.38",
 		"@types/core-js": "^2.5.5",
@@ -65,7 +66,6 @@
 		"jest-extended": "^3.2.4",
 		"jest-junit": "^16.0.0",
 		"kleur": "^4.1.5",
-		"moleculer": "^0.14.29",
 		"moleculer-db": "^0.8.23",
 		"nodemon": "^2.0.22",
 		"np": "^7.7.0",
@@ -78,8 +78,11 @@
 		"rollup-plugin-dts-bundle": "^1.0.0",
 		"rollup-plugin-esbuild": "^5.0.0",
 		"rollup-plugin-node-builtins": "^2.1.2",
+		"rollup-plugin-uglify": "^6.0.4",
 		"ts-jest": "^29.1.0",
 		"tsconfig-paths": "^4.2.0",
+		"tslib": "^2.5.2",
+		"typeof-items": "^1.0.1",
 		"typescript": "^5.0.4"
 	},
 	"jest": {
@@ -121,8 +124,9 @@
 	"dependencies": {
 		"bluebird": "^3.7.2",
 		"lodash": "^4.17.21",
-		"tslib": "^2.5.2",
-		"typeof-items": "^1.0.1",
+		"moleculer": "^0.14.29",
+		"mongodb": "^5.5.0",
+		"reflect-metadata": "^0.1.13",
 		"typeorm": "^0.3.16"
 	},
 	"publishConfig": {
