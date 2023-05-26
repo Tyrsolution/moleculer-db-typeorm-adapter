@@ -300,7 +300,14 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 				 */
 				if (dbRepository[method]) {
 					index === 0
-						? (this[method] = dbRepository[method])
+						? method === 'hasId' ||
+						  method === 'getRepository' ||
+						  method === 'target' ||
+						  method === 'metadata' ||
+						  method === 'useDataSource' ||
+						  method === 'getId'
+							? (this[method] = dbRepository[method])
+							: (this[`_${method}`] = dbRepository[method])
 						: (methodsToAdd[method] = dbRepository[method]);
 				}
 			});
@@ -402,6 +409,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	/**
 	 * Gets item by id(s). Can use find options, no where clause.
 	 * @methods
+	 * @param {Context} ctx - request context
 	 * @param {Partial<T>} key - primary db id column name
 	 * @param {string | number | string[] | number[]} id - id(s) of entity
 	 * @param {Object} findOptions - find options, like relations, order, etc. No where clause
@@ -409,21 +417,52 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 * @memberof TypeORMDbAdapter
 	 */
 	async findByIdWO<T extends Entity>(
+		ctx: Context,
 		key: string | undefined | null = this.service.settings.idField,
 		id: string | number | string[] | number[],
 		findOptions?: FindOneOptions<T> | FindManyOptions<T>,
 	): Promise<T | undefined> {
 		const transformId = this.beforeQueryTransformID(key);
+		const params = this.sanitizeParams(ctx, ctx.params);
 		const entity =
 			this.opts.type !== 'mongodb'
 				? isArray(id)
-					? await this['find']({ where: { [transformId]: In([...id]) }, ...findOptions })
-					: await this['findOneOrFail']({
+					? await this['_find']({
+							where: { [transformId]: In([...id]) },
+							...findOptions,
+					  })
+							.then((docs: any) => {
+								this.broker.logger.debug('Transforming findByIdWO docs...');
+								return this.transformDocuments(ctx, params, docs);
+							})
+							.catch((error: any) => {
+								this.broker.logger.error(`Failed to findByIdWO ${error}`);
+								new Errors.MoleculerServerError(
+									`Failed to findByIdWO ${error}`,
+									500,
+									'FAILED_TO_FIND_BY_ID_WO',
+									error,
+								);
+							})
+					: await this['_findOneOrFail']({
 							where: { [transformId]: In([id]) },
 							...findOptions,
 					  })
+							.then((docs: any) => {
+								this.broker.logger.debug('Transforming findByIdWO docs...');
+								return this.transformDocuments(ctx, params, docs);
+							})
+							.catch((error: any) => {
+								this.broker.logger.error(`Failed to findByIdWO ${error}`);
+								new Errors.MoleculerServerError(
+									`Failed to findByIdWO ${error}`,
+									500,
+									'FAILED_TO_FIND_BY_ID_WO',
+									error,
+								);
+							})
 				: isArray(id)
-				? await this['find']({
+				? await this['_find']({
 						where: {
 							[transformId]: {
 								$in: [
@@ -434,10 +473,36 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 							...findOptions,
 						},
 				  })
-				: await this['findOneOrFail']({
+						.then((docs: any) => {
+							this.broker.logger.debug('Transforming findByIdWO docs...');
+							return this.transformDocuments(ctx, params, docs);
+						})
+						.catch((error: any) => {
+							this.broker.logger.error(`Failed to findByIdWO ${error}`);
+							new Errors.MoleculerServerError(
+								`Failed to findByIdWO ${error}`,
+								500,
+								'FAILED_TO_FIND_BY_ID_WO',
+								error,
+							);
+						})
+				: await this['_findOneOrFail']({
 						where: { [transformId]: { $in: [this.toMongoObjectId(id)] } },
 						...findOptions,
-				  }); // needed for mongodb
+				  })
+						.then((docs: any) => {
+							this.broker.logger.debug('Transforming findByIdWO docs...');
+							return this.transformDocuments(ctx, params, docs);
+						})
+						.catch((error: any) => {
+							this.broker.logger.error(`Failed to findByIdWO ${error}`);
+							new Errors.MoleculerServerError(
+								`Failed to findByIdWO ${error}`,
+								500,
+								'FAILED_TO_FIND_BY_ID_WO',
+								error,
+							);
+						}); // needed for mongodb
 		return this.afterRetrieveTransformID(entity, this.service.settings.idField) as
 			| T
 			| undefined;
@@ -446,6 +511,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	/**
 	 * Gets item by id(s). No find options can be provided
 	 * @methods
+	 * @param {Context} ctx - request context
 	 * @param {Partial<T>} key - primary db id column name
 	 * @param {string | number | string[] | number[]} id - id(s) of entity
 	 * @returns {Promise<T | undefined>}
@@ -453,17 +519,45 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 *
 	 */
 	async findById<T extends Entity>(
+		ctx: Context,
 		key: string | undefined | null = this.service.settings.idField,
 		id: string | number | string[] | number[],
 	): Promise<T | undefined> {
 		const transformId = this.beforeQueryTransformID(key);
+		const params = this.sanitizeParams(ctx, ctx.params);
 		const entity =
 			this.opts.type !== 'mongodb'
 				? isArray(id)
-					? await this['findBy']({ [transformId]: In([...id]) })
-					: await this['findOneByOrFail']({ [transformId]: In([id]) })
+					? await this['_findBy']({ [transformId]: In([...id]) })
+							.then((docs: any) => {
+								this.broker.logger.debug('Transforming findByIdWO docs...');
+								return this.transformDocuments(ctx, params, docs);
+							})
+							.catch((error: any) => {
+								this.broker.logger.error(`Failed to findById ${error}`);
+								new Errors.MoleculerServerError(
+									`Failed to findById ${error}`,
+									500,
+									'FAILED_TO_FIND_BY_ID',
+									error,
+								);
+							})
+					: await this['_findOneByOrFail']({ [transformId]: In([id]) })
+							.then((docs: any) => {
+								this.broker.logger.debug('Transforming findByIdWO docs...');
+								return this.transformDocuments(ctx, params, docs);
+							})
+							.catch((error: any) => {
+								this.broker.logger.error(`Failed to findById ${error}`);
+								new Errors.MoleculerServerError(
+									`Failed to findById ${error}`,
+									500,
+									'FAILED_TO_FIND_BY_ID',
+									error,
+								);
+							})
 				: isArray(id)
-				? await this['find']({
+				? await this['_find']({
 						where: {
 							[transformId]: {
 								$in: [
@@ -472,9 +566,35 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 							},
 						},
 				  })
-				: await this['findOneByOrFail']({
+						.then((docs: any) => {
+							this.broker.logger.debug('Transforming findByIdWO docs...');
+							return this.transformDocuments(ctx, params, docs);
+						})
+						.catch((error: any) => {
+							this.broker.logger.error(`Failed to findById ${error}`);
+							new Errors.MoleculerServerError(
+								`Failed to findById ${error}`,
+								500,
+								'FAILED_TO_FIND_BY_ID',
+								error,
+							);
+						})
+				: await this['_findOneByOrFail']({
 						where: { [transformId]: { $in: [this.toMongoObjectId(id)] } },
-				  }); // needed for mongodb
+				  })
+						.then((docs: any) => {
+							this.broker.logger.debug('Transforming findByIdWO docs...');
+							return this.transformDocuments(ctx, params, docs);
+						})
+						.catch((error: any) => {
+							this.broker.logger.error(`Failed to findById ${error}`);
+							new Errors.MoleculerServerError(
+								`Failed to findById ${error}`,
+								500,
+								'FAILED_TO_FIND_BY_ID',
+								error,
+							);
+						}); // needed for mongodb
 		return this.afterRetrieveTransformID(entity, this.service.settings.idField) as
 			| T
 			| undefined;
@@ -484,6 +604,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 * Gets multiple items by id.
 	 * No find options
 	 * @methods
+	 * @param {Context} ctx - request context
 	 * @param {Partial<T>} key - primary db id column name
 	 * @param {Array<string> | Array<number>} ids - ids of entity
 	 * @returns {Promise<T | undefined>}
@@ -491,14 +612,29 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 * @deprecated - use findById instead. It now supports multiple ids
 	 */
 	async findByIds<T extends Entity>(
+		ctx: Context,
 		key: string | undefined | null = this.service.settings.idField,
 		ids: any[],
 	): Promise<T | undefined> {
 		const transformId = this.beforeQueryTransformID(key);
+		const params = this.sanitizeParams(ctx, ctx.params);
 		const entity =
 			this.opts.type !== 'mongodb'
-				? await this['findBy']({ [transformId]: In([...ids]) })
-				: await this['find']({
+				? await this['_findBy']({ [transformId]: In([...ids]) })
+						.then((docs: any) => {
+							this.broker.logger.debug('Transforming findByIds docs...');
+							return this.transformDocuments(ctx, params, docs);
+						})
+						.catch((error: any) => {
+							this.broker.logger.error(`Failed to findByIds ${error}`);
+							new Errors.MoleculerServerError(
+								`Failed to findByIds ${error}`,
+								500,
+								'FAILED_TO_FIND_BY_IDS',
+								error,
+							);
+						})
+				: await this['_find']({
 						where: {
 							[transformId]: {
 								$in: [
@@ -506,7 +642,20 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 								],
 							},
 						},
-				  }); // needed for mongodb. FindBy is having issues: https://github.com/typeorm/typeorm/issues/8889
+				  })
+						.then((docs: any) => {
+							this.broker.logger.debug('Transforming findByIds docs...');
+							return this.transformDocuments(ctx, params, docs);
+						})
+						.catch((error: any) => {
+							this.broker.logger.error(`Failed to findByIds ${error}`);
+							new Errors.MoleculerServerError(
+								`Failed to findByIds ${error}`,
+								500,
+								'FAILED_TO_FIND_BY_IDS',
+								error,
+							);
+						}); // needed for mongodb. FindBy is having issues: https://github.com/typeorm/typeorm/issues/8889
 		return this.afterRetrieveTransformID(entity, this.service.settings.idField) as
 			| T
 			| undefined;
@@ -516,6 +665,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 * Gets multiple items by id.
 	 * Can use find options, no where clause.
 	 * @methods
+	 * @param {Context} ctx - request context
 	 * @param {Partial<T>} key - primary db id column name
 	 * @param {Array<string> | Array<number>} ids - ids of entity
 	 * @param {Object} findOptions - find options, like relations, order, etc. No where clause
@@ -525,15 +675,30 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 *
 	 */
 	async findByIdsWO<T extends Entity>(
+		ctx: Context,
 		key: string | undefined | null = this.service.settings.idField,
 		ids: any[],
 		findOptions?: FindManyOptions<T>,
 	): Promise<T | undefined> {
 		const transformId = this.beforeQueryTransformID(key);
+		const params = this.sanitizeParams(ctx, ctx.params);
 		const entity =
 			this.opts.type !== 'mongodb'
-				? await this['find']({ where: { [transformId]: In([...ids]) }, ...findOptions })
-				: await this['find']({
+				? await this['_find']({ where: { [transformId]: In([...ids]) }, ...findOptions })
+						.then((docs: any) => {
+							this.broker.logger.debug('Transforming findByIdsWO docs...');
+							return this.transformDocuments(ctx, params, docs);
+						})
+						.catch((error: any) => {
+							this.broker.logger.error(`Failed to findByIdsWO ${error}`);
+							new Errors.MoleculerServerError(
+								`Failed to findByIdsWO ${error}`,
+								500,
+								'FAILED_TO_FIND_BY_IDS_WO',
+								error,
+							);
+						})
+				: await this['_find']({
 						where: {
 							[transformId]: {
 								$in: [
@@ -542,7 +707,20 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 							},
 							...findOptions,
 						},
-				  }); // needed for mongodb. FindBy is having issues: https://github.com/typeorm/typeorm/issues/8889
+				  })
+						.then((docs: any) => {
+							this.broker.logger.debug('Transforming findByIdsWO docs...');
+							return this.transformDocuments(ctx, params, docs);
+						})
+						.catch((error: any) => {
+							this.broker.logger.error(`Failed to findByIdsWO ${error}`);
+							new Errors.MoleculerServerError(
+								`Failed to findByIdsWO ${error}`,
+								500,
+								'FAILED_TO_FIND_BY_IDS_WO',
+								error,
+							);
+						}); // needed for mongodb. FindBy is having issues: https://github.com/typeorm/typeorm/issues/8889
 		return this.afterRetrieveTransformID(entity, this.service.settings.idField) as
 			| T
 			| undefined;
@@ -551,17 +729,45 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	/**
 	 * Update an entity by ID
 	 * @methods
+	 * @param {Context} ctx - request context
 	 * @param {any} id - ID of record to be updated
 	 * @param {Object} update - Object with update data
 	 * @returns {Promise} - Updated record
 	 * @memberof TypeORMDbAdapter
 	 */
-	async updateById(id: any, update: any): Promise<any> {
+	async updateById(ctx: Context, id: any, update: any): Promise<any> {
 		const transformId: any = this.beforeQueryTransformID(id);
+		const params = this.sanitizeParams(ctx, ctx.params);
 		const entity =
 			this.opts.type !== 'mongodb'
-				? await this['update']({ [transformId]: id }, update)
-				: await this['update']({ [transformId]: this.toMongoObjectId(id) }, update);
+				? await this['_update']({ [transformId]: id }, update)
+						.then((docs: any) => {
+							this.broker.logger.debug('Transforming updateById docs...');
+							return this.transformDocuments(ctx, params, docs);
+						})
+						.catch((error: any) => {
+							this.broker.logger.error(`Failed to updateById ${error}`);
+							new Errors.MoleculerServerError(
+								`Failed to updateById ${error}`,
+								500,
+								'FAILED_TO_UPDATE_BY_ID',
+								error,
+							);
+						})
+				: await this['_update']({ [transformId]: this.toMongoObjectId(id) }, update)
+						.then((docs: any) => {
+							this.broker.logger.debug('Transforming updateById docs...');
+							return this.transformDocuments(ctx, params, docs);
+						})
+						.catch((error: any) => {
+							this.broker.logger.error(`Failed to updateById ${error}`);
+							new Errors.MoleculerServerError(
+								`Failed to updateById ${error}`,
+								500,
+								'FAILED_TO_UPDATE_BY_ID',
+								error,
+							);
+						});
 		return this.afterRetrieveTransformID(entity, this.service.settings.idField);
 	}
 
@@ -647,9 +853,9 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 
 		return all([
 			// Get rows
-			this['find'](modifiedFindParams),
+			this['_find'](modifiedFindParams),
 			// Get count of all rows
-			this['count'](modifiedCountParams),
+			this['_count'](modifiedCountParams),
 		]).then(async (res) => {
 			return await this.transformDocuments(ctx, params, res[0]).then((docs: any) => {
 				return {
@@ -723,6 +929,8 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 					`"${idField}":`,
 				),
 			);
+		} else {
+			newEntity = entity;
 		}
 		return newEntity;
 	}
@@ -803,51 +1011,77 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 * @memberof TypeORMDbAdapter
 	 */
 	transformDocuments(ctx: any, params: any, docs: any): Promise<Array<any> | object> {
+		this.broker.logger.debug('Transforming documents..');
 		let isDoc = false;
+		this.broker.logger.debug(`Setting userDefinedIDField to ${this.service.settings.idField}`);
 		const userDefinedIDField = this.service.settings.idField;
+		this.broker.logger.debug('Checking if docs is an array or an object..');
 		if (!Array.isArray(docs)) {
+			this.broker.logger.debug('Docs is not an array');
 			if (isObject(docs)) {
+				this.broker.logger.debug('Docs is an object, converting to array..');
 				isDoc = true;
 				docs = [docs];
-			} else return resolve(docs);
+			} else {
+				this.broker.logger.debug('Docs is not an object, returning docs..');
+				return resolve(docs);
+			}
 		}
 
 		return (
 			resolve(docs)
 				// Convert entity to JS object
-				.then((docs) => docs.map((doc: any) => this.entityToObject(doc)))
+				.then((docs) =>
+					docs.map((doc: any) => {
+						this.broker.logger.debug('Converting entity to JS object...');
+						return this.entityToObject(doc);
+					}),
+				)
 
 				// Apply idField
 				.then((docs) =>
-					docs.map((doc: any) => this.afterRetrieveTransformID(doc, userDefinedIDField)),
+					docs.map((doc: any) => {
+						this.broker.logger.debug('Applying idField to docs...');
+						return this.afterRetrieveTransformID(doc, userDefinedIDField);
+					}),
 				)
 				// Encode IDs
 				.then((docs) =>
 					docs.map((doc: { [x: string]: any }) => {
+						this.broker.logger.debug('Encoding IDs..');
 						doc[userDefinedIDField] = this.encodeID(doc[userDefinedIDField]);
 						return doc;
 					}),
 				)
 				// Populate
-				.then((json) =>
-					ctx && params.populate ? this.populateDocs(ctx, json, params.populate) : json,
-				)
+				.then((json) => {
+					this.broker.logger.debug(`Populating docs with ${params.populate}..`);
+					return ctx && params.populate
+						? this.populateDocs(ctx, json, params.populate)
+						: json;
+				})
 
 				// TODO onTransformHook
 
 				// Filter fields
 				.then((json) => {
+					this.broker.logger.debug('Attempting to filter fields..');
 					if (ctx && params.fields) {
+						this.broker.logger.debug('Fields found in params..');
 						const fields = isString(params.fields)
 							? // Compatibility with < 0.4
 							  /* istanbul ignore next */
 							  params.fields.split(/\s+/)
 							: params.fields;
 						// Authorize the requested fields
+						this.broker.logger.debug('Authorizing fields..');
 						const authFields = this.authorizeFields(fields);
-
+						this.broker.logger.debug('Filtering fields and returning object..');
 						return json.map((item: any) => this.filterFields(item, authFields));
 					} else {
+						this.broker.logger.debug(
+							'No fields found in params, returning filtered object..',
+						);
 						return json.map((item: any) =>
 							this.filterFields(item, this.service.settings.fields),
 						);
@@ -856,6 +1090,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 
 				// Filter excludeFields
 				.then((json) => {
+					this.broker.logger.debug('Attempting to filter excludeFields..');
 					const askedExcludeFields =
 						ctx && params.excludeFields
 							? isString(params.excludeFields)
@@ -865,18 +1100,26 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 					const excludeFields = askedExcludeFields.concat(
 						this.service.settings.excludeFields || [],
 					);
-
 					if (Array.isArray(excludeFields) && excludeFields.length > 0) {
+						this.broker.logger.debug(
+							'ExcludeFields found in params, returning filtered object..',
+						);
 						return json.map((doc: any) => {
 							return this._excludeFields(doc, excludeFields);
 						});
 					} else {
+						this.broker.logger.debug(
+							'No excludeFields found in params, returning object..',
+						);
 						return json;
 					}
 				})
 
 				// Return
-				.then((json) => (isDoc ? json[0] : json))
+				.then((json) => {
+					this.broker.logger.debug('Returning json object..');
+					return isDoc ? json[0] : json;
+				})
 				.catch((err) => {
 					/* istanbul ignore next */
 					this.broker.logger.error('Transforming documents is failed!', err);
@@ -999,78 +1242,138 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 * @memberof TypeORMDbAdapter
 	 */
 	populateDocs(ctx: any, docs: any, populateFields?: any[]): Promise<any> {
+		this.broker.logger.debug('Attempting to populate documents..');
 		if (
 			!this.service.settings.populates ||
 			!Array.isArray(populateFields) ||
 			populateFields.length == 0
-		)
+		) {
+			this.broker.logger.debug('No populateFields found, returning docs..');
 			return resolve(docs);
+		}
 
-		if (docs == null || (!isObject(docs) && !Array.isArray(docs))) return resolve(docs);
-
+		if (docs == null || (!isObject(docs) && !Array.isArray(docs))) {
+			this.broker.logger.debug('No docs found, returning docs..');
+			return resolve(docs);
+		}
+		this.broker.logger.debug(
+			`Setting settingPopulateFields with ${Object.keys(this.service.settings.populates)}`,
+		);
 		const settingPopulateFields = Object.keys(this.service.settings.populates);
 
-		/* Group populateFields by populatesFields for deep population.
-			(e.g. if "post" in populates and populateFields = ["post.author", "post.reviewer", "otherField"])
-			then they would be grouped together: { post: ["post.author", "post.reviewer"], otherField:["otherField"]}
-			*/
+		/**
+		 * Group populateFields by populatesFields for deep population.
+		 * (e.g. if "post" in populates and populateFields = ["post.author", "post.reviewer", "otherField"])
+		 * then they would be grouped together: { post: ["post.author", "post.reviewer"], otherField:["otherField"]}
+		 */
+		this.broker.logger.debug('Grouping populateFields..');
 		const groupedPopulateFields = populateFields.reduce((obj, populateField) => {
+			this.broker.logger.debug(`Checking if ${populateField} is in ${settingPopulateFields}`);
 			const settingPopulateField = settingPopulateFields.find(
 				(settingPopulateField) =>
 					settingPopulateField === populateField ||
 					populateField.startsWith(settingPopulateField + '.'),
 			);
 			if (settingPopulateField != null) {
+				this.broker.logger.debug('Found settingPopulateField');
+				this.broker.logger.debug(`Checking if ${settingPopulateField} is in `, obj);
+				// this.broker.logger.debug(`Checking if ${settingPopulateField} is in ${JSON.stringify(obj)}`);
 				if (obj[settingPopulateField] == null) {
+					this.broker.logger.debug(
+						'No settingPopulateField found, setting to empty array',
+					);
+					this.broker.logger.debug(
+						`Adding ${[populateField]} to ${obj[settingPopulateField]}`,
+					);
 					obj[settingPopulateField] = [populateField];
 				} else {
+					this.broker.logger.debug(
+						`Pushing ${populateField} to ${obj[settingPopulateField]}`,
+					);
 					obj[settingPopulateField].push(populateField);
 				}
 			}
+			this.broker.logger.debug(`Returning ${JSON.stringify(obj)}`);
 			return obj;
 		}, {});
 
 		let promises = [];
+		this.broker.logger.debug('Looping through settingPopulateFields...');
 		for (const populatesField of settingPopulateFields) {
+			this.broker.logger.debug(
+				`setting rule to ${this.service.settings.populates[populatesField]}`,
+			);
 			let rule = this.service.settings.populates[populatesField];
-			if (groupedPopulateFields[populatesField] == null) continue; // skip
-
+			if (groupedPopulateFields[populatesField] == null) {
+				this.broker.logger.debug('No groupedPopulateFields found, skipping');
+				continue;
+			} // skip
 			// if the rule is a function, save as a custom handler
+			this.broker.logger.debug('Checking if rule is a function...');
 			if (isFunction(rule)) {
+				this.broker.logger.debug('Rule is a function, setting handler');
 				rule = {
 					handler: method(rule),
 				};
 			}
-
+			this.broker.logger.debug('Rule is not a function. Checking if rule is a string...');
 			// If the rule is string, convert to object
 			if (isString(rule)) {
+				this.broker.logger.debug('Rule is a string, setting action');
 				rule = {
 					action: rule,
 				};
 			}
-
-			if (rule.field === undefined) rule.field = populatesField;
-
+			this.broker.logger.debug('Rule is not a string. Checking if rule is undefined..');
+			if (rule.field === undefined) {
+				this.broker.logger.debug(
+					`Rule is undefined, setting rule.field to ${populatesField}`,
+				);
+				rule.field = populatesField;
+			}
+			this.broker.logger.debug('Setting arr to docs...');
 			let arr = Array.isArray(docs) ? docs : [docs];
 
 			// Collect IDs from field of docs (flatten, compact & unique list)
+			this.broker.logger.debug(
+				'Collecting IDs from field of docs, (flatten, compact & unique list) setting idList',
+			);
 			let idList = uniq(flattenDeep(compact(arr.map((doc) => get(doc, rule.field)))));
 			// Replace the received models according to IDs in the original docs
+			this.broker.logger.debug(
+				'Replacing the received models according to IDs in the original docs',
+			);
 			const resultTransform = (populatedDocs: { [x: string]: any }) => {
+				this.broker.logger.debug('Looping through docs...');
 				arr.forEach((doc) => {
+					this.broker.logger.debug(`Setting id to ${get(doc, rule.field)}`);
 					let id = get(doc, rule.field);
+					this.broker.logger.debug(`Checking if id is an array...`);
 					if (isArray(id)) {
+						this.broker.logger.debug(
+							`id is an array, setting models to ${compact(
+								id.map((id) => populatedDocs[id]),
+							)}`,
+						);
 						let models = compact(id.map((id) => populatedDocs[id]));
+						this.broker.logger.debug('Setting doc to models...');
 						set(doc, populatesField, models);
 					} else {
+						this.broker.logger.debug(
+							`id is not an array, setting doc to populatedDocs[id]`,
+						);
 						set(doc, populatesField, populatedDocs[id]);
 					}
 				});
 			};
-
+			this.broker.logger.debug('Checking if rule.handler is defined...');
 			if (rule.handler) {
+				this.broker.logger.debug('rule.handler is defined, calling rule.handler');
 				promises.push(rule.handler.call(this, idList, arr, rule, ctx));
 			} else if (idList.length > 0) {
+				this.broker.logger.debug(
+					'rule.handler is not defined and idList.length > 0, calling target action & collect the promises',
+				);
 				// Call the target action & collect the promises
 				const params = Object.assign(
 					{
@@ -1088,15 +1391,20 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 					},
 					rule.params || {},
 				);
-
+				this.broker.logger.debug('Checking if params.populate.length === 0...');
 				if (params.populate.length === 0) {
+					this.broker.logger.debug(
+						'params.populate.length === 0, deleting params.populate',
+					);
 					delete params.populate;
 				}
-
+				this.broker.logger.debug(
+					`Calling ${rule.action} with params ${params} then transforming result...`,
+				);
 				promises.push(ctx.call(rule.action, params).then(resultTransform));
 			}
 		}
-
+		this.broker.logger.debug('Returning all promises...');
 		return all(promises).then(() => docs);
 	}
 

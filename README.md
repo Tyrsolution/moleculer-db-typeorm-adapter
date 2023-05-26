@@ -311,6 +311,7 @@ Gets item by id(s). Can use find options, no where clause.
 ### Parameters
 | Property | Type | Default | Description |
 | -------- | ---- | ------- | ----------- |
+| `ctx` | `Context` | **required** | request context |
 | `key` | `Partial.<T>` | **required** | primary db id column name |
 | `id` | `string`, `number`, `Array.<string>`, `Array.<number>` | **required** | id(s) of entity |
 | `findOptions` | `Object` | **required** | find options, like relations, order, etc. No where clause |
@@ -328,6 +329,7 @@ Gets item by id(s). No find options can be provided
 ### Parameters
 | Property | Type | Default | Description |
 | -------- | ---- | ------- | ----------- |
+| `ctx` | `Context` | **required** | request context |
 | `key` | `Partial.<T>` | **required** | primary db id column name |
 | `id` | `string`, `number`, `Array.<string>`, `Array.<number>` | **required** | id(s) of entity |
 
@@ -345,6 +347,7 @@ No find options
 ### Parameters
 | Property | Type | Default | Description |
 | -------- | ---- | ------- | ----------- |
+| `ctx` | `Context` | **required** | request context |
 | `key` | `Partial.<T>` | **required** | primary db id column name |
 | `ids` | `Array.<string>`, `Array.<number>` | **required** | ids of entity |
 
@@ -362,6 +365,7 @@ Can use find options, no where clause.
 ### Parameters
 | Property | Type | Default | Description |
 | -------- | ---- | ------- | ----------- |
+| `ctx` | `Context` | **required** | request context |
 | `key` | `Partial.<T>` | **required** | primary db id column name |
 | `ids` | `Array.<string>`, `Array.<number>` | **required** | ids of entity |
 | `findOptions` | `Object` | **required** | find options, like relations, order, etc. No where clause |
@@ -379,6 +383,7 @@ Update an entity by ID
 ### Parameters
 | Property | Type | Default | Description |
 | -------- | ---- | ------- | ----------- |
+| `ctx` | `Context` | **required** | request context |
 | `id` | `any` | **required** | ID of record to be updated |
 | `update` | `Object` | **required** | Object with update data |
 

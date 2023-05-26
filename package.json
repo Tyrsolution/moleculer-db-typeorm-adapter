@@ -18,7 +18,7 @@
 		"coverall": "cat ./coverage/lcov.info | ./node_modules/coveralls/bin/coveralls.js",
 		"postversion": "git push && git push --follow-tags",
 		"pre-release": "yarn build:clean && run-p build:dist",
-		"build": "yarn build:clean && set NODE_ENV=release&& run-p build:dist",
+		"build-release": "yarn build:clean && set NODE_ENV=release&& run-p build:dist",
 		"build:clean": "rimraf dist bin",
 		"build:dist": "rollup -c",
 		"build:dts": "dts-bundle-generator -o dist/index.d.ts src/index.ts",
