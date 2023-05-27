@@ -323,6 +323,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 						...methodsToAdd,
 						findByIdWO: this.findByIdWO,
 						findById: this.findById,
+						getPopulations: this.getPopulations,
 						findByIds: this.findByIds,
 						findByIdsWO: this.findByIdsWO,
 						list: this.list,
@@ -598,6 +599,69 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 		return this.afterRetrieveTransformID(entity, this.service.settings.idField) as
 			| T
 			| undefined;
+	}
+
+	/**
+	 * Populates entity(ies) by id(s) of another record.
+	 *
+	 * @methods
+	 *
+	 * @param {Context} ctx - Context instance.
+	 * @param {Object?} params - Parameters.
+	 *
+	 * @returns {Object|Array<Object>} Found entity(ies).
+	 *
+	 * @throws {EntityNotFoundError} - 404 Entity not found
+	 */
+	getPopulations(ctx: Context, params?: any): Object | Array<Object> {
+		let id = params.id;
+		let origDoc: any;
+		let shouldMapping = params.mapping === true;
+		return this['findById'](ctx, null, id)
+			.then((doc) => {
+				if (!doc)
+					return Promise.reject(
+						new Errors.MoleculerServerError(
+							`Failed to findById ${id}`,
+							500,
+							'FAILED_TO_FIND_BY_ID',
+						),
+					);
+
+				if (shouldMapping) {
+					origDoc = isArray(doc) ? doc.map((d) => cloneDeep(d)) : cloneDeep(doc);
+				} else {
+					origDoc = doc;
+				}
+
+				return this.transformDocuments(ctx, params, doc);
+			})
+			.then((json) => {
+				if (params.mapping !== true) return json;
+
+				let res: any = {};
+				if (isArray(json)) {
+					json.forEach((doc, i) => {
+						const id = this.encodeID(
+							// @ts-ignore
+							this.afterRetrieveTransformID(
+								origDoc[i],
+								this.service.settings.idField,
+							)[this.service.settings.idField],
+						);
+						res[id] = doc;
+					});
+				} else if (isObject(json)) {
+					const id = this.encodeID(
+						// @ts-ignore
+						this.afterRetrieveTransformID(origDoc, this.service.settings.idField)[
+							this.service.settings.idField
+						],
+					);
+					res[id] = json;
+				}
+				return res;
+			});
 	}
 
 	/**

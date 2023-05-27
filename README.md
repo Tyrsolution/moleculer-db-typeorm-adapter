@@ -339,6 +339,22 @@ Gets item by id(s). No find options can be provided
 
 
 
+## `getPopulations` 
+
+Populates entity(ies) by id(s) of another record.
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `ctx` | `Context` | **required** | Context instance. |
+| `params` | `Object` | - | Parameters. |
+
+### Results
+**Type:** `Object`, `Array.<Object>`
+
+Found entity(ies).
+
+
 ## `findByIds` ![Deprecated action](https://img.shields.io/badge/status-deprecated-orange.svg) 
 
 Gets multiple items by id.

@@ -796,6 +796,19 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 		id: string | number | string[] | number[],
 	): Promise<T | undefined>;
 	/**
+	 * Populates entity(ies) by id(s) of another record.
+	 *
+	 * @methods
+	 *
+	 * @param {Context} ctx - Context instance.
+	 * @param {Object?} params - Parameters.
+	 *
+	 * @returns {Object|Array<Object>} Found entity(ies).
+	 *
+	 * @throws {EntityNotFoundError} - 404 Entity not found
+	 */
+	getPopulations(ctx: Context, params?: any): Object | Array<Object>;
+	/**
 	 * Gets items by id.
 	 *
 	 * @methods
@@ -1658,6 +1671,19 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 		key: string | undefined | null,
 		id: string | number | string[] | number[],
 	): Promise<T | undefined>;
+	/**
+	 * Populates entity(ies) by id(s) of another record.
+	 *
+	 * @methods
+	 *
+	 * @param {Context} ctx - Context instance.
+	 * @param {Object?} params - Parameters.
+	 *
+	 * @returns {Object|Array<Object>} Found entity(ies).
+	 *
+	 * @throws {EntityNotFoundError} - 404 Entity not found
+	 */
+	getPopulations(ctx: Context, params?: any): Object | Array<Object>;
 	/**
 	 * Gets items by id.
 	 *
