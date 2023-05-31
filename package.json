@@ -123,7 +123,7 @@
 		"lodash": "^4.17.21",
 		"tslib": "^2.5.0",
 		"typeof-items": "^1.0.1",
-		"typeorm": "^0.3.15"
+		"typeorm": "^0.3.16"
 	},
 	"publishConfig": {
 		"access": "public"
