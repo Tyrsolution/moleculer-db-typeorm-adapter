@@ -121,7 +121,7 @@
 	"dependencies": {
 		"bluebird": "^3.7.2",
 		"lodash": "^4.17.21",
-		"tslib": "^2.5.0",
+		"tslib": "^2.5.1",
 		"typeof-items": "^1.0.1",
 		"typeorm": "^0.3.15"
 	},
