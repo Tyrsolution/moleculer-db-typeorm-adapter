@@ -2,7 +2,8 @@
 - [Introduction](introduction)
 - [Quick Start](quick-start)
 - [Configuration](configuration)
-- [Usage](usage)
+- [Basic Usage](usage)
+- [Relations and Populations](relations.md)
 - [API](api)
 - **Links**
 - [![Github](assets/img/github.svg)Github](https://github.com/tyrsolution/moleculer-db-typeorm-adapter)

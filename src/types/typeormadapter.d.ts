@@ -14,6 +14,7 @@ import {
 	CollStatsOptions,
 	Collection,
 	CommandOperationOptions,
+	CountOptions,
 	CreateIndexesOptions,
 	DataSource,
 	DataSourceOptions,
@@ -23,6 +24,7 @@ import {
 	EntityManager,
 	EntityTarget,
 	Filter,
+	FilterOperators,
 	FindCursor,
 	FindManyOptions,
 	FindOneAndDeleteOptions,
@@ -55,6 +57,7 @@ import {
 	UpdateResult,
 } from 'typeorm';
 import { PickKeysByType } from 'typeorm/common/PickKeysByType';
+import { MongoFindOneOptions } from 'typeorm/find-options/mongodb/MongoFindOneOptions';
 import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 import { UpsertOptions } from 'typeorm/repository/UpsertOptions';
 
@@ -762,6 +765,60 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	 * @memberof TypeORMDbAdapter
 	 */
 	beforeQueryTransformID(idField: any): any;
+	/**
+	 * Count number of matching documents in the db to a query.
+	 *
+	 * @methods
+	 * @param {Object} options - count options
+	 * @param {Object?} query - query options
+	 * @returns {Promise<number>}
+	 * @memberof TypeORMDbAdapter
+	 */
+	count<T extends Entity>(
+		options?: FindManyOptions<T> | CountOptions,
+		query?: ObjectLiteral,
+	): Promise<number>;
+	/**
+	 * Finds entities that match given find options.
+	 *
+	 * @methods
+	 * @param {Context} ctx - request context
+	 * @param {Object} findManyOptions - find many options
+	 * @returns {Promise<[T | number]>}
+	 * @memberof TypeORMDbAdapter
+	 */
+	find<T extends Entity>(
+		ctx: Context,
+		findManyOptions?: FindManyOptions<T> | Partial<T> | FilterOperators<T>,
+	): Promise<[T[], number]>;
+	/**
+	 * Finds first item by a given find options.
+	 * If entity was not found in the database - returns null.
+	 * Available Options props:
+	 * - comment
+	 * - select
+	 * - where
+	 * - relations
+	 * - relationLoadStrategy
+	 * - join
+	 * - order
+	 * - cache
+	 * - lock
+	 * - withDeleted
+	 * - loadRelationIds
+	 * - loadEagerRelations
+	 * - transaction
+	 *
+	 * @methods
+	 * @param {Context} ctx - request context
+	 * @param {Object} findOptions - find options
+	 * @returns {Promise<T | undefined>}
+	 * @memberof TypeORMDbAdapter
+	 */
+	findOne<T extends Entity>(
+		ctx: Context,
+		findOptions?: FindOneOptions<T> | MongoFindOneOptions<T>,
+	): Promise<T | undefined>;
 	/**
 	 * Gets item by id. Can use find options
 	 *
@@ -1638,6 +1695,60 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	 * @memberof TypeORMDbAdapter
 	 */
 	beforeQueryTransformID(idField: any): any;
+	/**
+	 * Count number of matching documents in the db to a query.
+	 *
+	 * @methods
+	 * @param {Object} options - count options
+	 * @param {Object?} query - query options
+	 * @returns {Promise<number>}
+	 * @memberof TypeORMDbAdapter
+	 */
+	count<T extends Entity>(
+		options?: FindManyOptions<T> | CountOptions,
+		query?: ObjectLiteral,
+	): Promise<number>;
+	/**
+	 * Finds entities that match given find options.
+	 *
+	 * @methods
+	 * @param {Context} ctx - request context
+	 * @param {Object} findManyOptions - find many options
+	 * @returns {Promise<[T | number]>}
+	 * @memberof TypeORMDbAdapter
+	 */
+	find<T extends Entity>(
+		ctx: Context,
+		findManyOptions?: FindManyOptions<T> | Partial<T> | FilterOperators<T>,
+	): Promise<[T[], number]>;
+	/**
+	 * Finds first item by a given find options.
+	 * If entity was not found in the database - returns null.
+	 * Available Options props:
+	 * - comment
+	 * - select
+	 * - where
+	 * - relations
+	 * - relationLoadStrategy
+	 * - join
+	 * - order
+	 * - cache
+	 * - lock
+	 * - withDeleted
+	 * - loadRelationIds
+	 * - loadEagerRelations
+	 * - transaction
+	 *
+	 * @methods
+	 * @param {Context} ctx - request context
+	 * @param {Object} findOptions - find options
+	 * @returns {Promise<T | undefined>}
+	 * @memberof TypeORMDbAdapter
+	 */
+	findOne<T extends Entity>(
+		ctx: Context,
+		findOptions?: FindOneOptions<T> | MongoFindOneOptions<T>,
+	): Promise<T | undefined>;
 	/**
 	 * Gets item by id. Can use find options
 	 *

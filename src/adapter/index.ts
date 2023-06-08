@@ -38,10 +38,13 @@ import {
 	In,
 	MongoEntityManager,
 	FindManyOptions,
+	FilterOperators,
+	CountOptions,
 } from 'typeorm';
 import ConnectionManager from './connectionManager';
 import { ListParams } from '../types/typeormadapter';
 import { ObjectId } from 'mongodb';
+import { MongoFindOneOptions } from 'typeorm/find-options/mongodb/MongoFindOneOptions';
 // const type = require('typeof-items');
 
 /**
@@ -314,9 +317,10 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 			/**
 			 * apply entity methods object to this.adapter.entityName
 			 */
-			!entity['save']
+			!dbRepository['save']
 				? this.broker.logger.warn(
-						`Entity class ${entityName} does not extend TypeORM BaseEntity, use data mapping with this.adapter.repository instead of active record methodology.`,
+						`Entity class ${entityName} does not extend TypeORM BaseEntity.
+						If you are not using MongoDB, use data mapping with this.adapter.repository or this.adapter.manager instead of active record methodology.`,
 				  )
 				: index !== 0
 				? (this[entityName] = {
@@ -324,6 +328,9 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 						findByIdWO: this.findByIdWO,
 						findById: this.findById,
 						getPopulations: this.getPopulations,
+						count: this.count,
+						find: this.find,
+						findOne: this.findOne,
 						findByIds: this.findByIds,
 						findByIdsWO: this.findByIdsWO,
 						list: this.list,
@@ -406,6 +413,103 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	// -------------------------------------------------------------------------
 	// Public Methods
 	// -------------------------------------------------------------------------
+
+	/**
+	 * Count number of matching documents in the db to a query.
+	 *
+	 * @methods
+	 * @param {Object} options - count options
+	 * @param {Object?} query - query options
+	 * @returns {Promise<number>}
+	 * @memberof TypeORMDbAdapter
+	 */
+	async count<T extends Entity>(
+		options?: FindManyOptions<T> | CountOptions,
+		query?: ObjectLiteral,
+	): Promise<number> {
+		return this.opts.type !== 'mongodb'
+			? await this['_count'](options)
+			: await this['_count'](query, options);
+	}
+
+	/**
+	 * Finds entities that match given find options.
+	 *
+	 * @methods
+	 * @param {Context} ctx - request context
+	 * @param {Object} findManyOptions - find many options
+	 * @returns {Promise<[T | number]>}
+	 * @memberof TypeORMDbAdapter
+	 */
+	async find<T extends Entity>(
+		ctx: Context,
+		findManyOptions?: FindManyOptions<T> | Partial<T> | FilterOperators<T>,
+	): Promise<[T[], number]> {
+		const params = this.sanitizeParams(ctx, ctx.params);
+		const entity = await this['_find'](findManyOptions)
+			.then((docs: any) => {
+				this.broker.logger.debug('Transforming findByIdWO docs...');
+				return this.transformDocuments(ctx, params, docs);
+			})
+			.catch((error: any) => {
+				this.broker.logger.error(`Failed to findByIdWO ${error}`);
+				new Errors.MoleculerServerError(
+					`Failed to findByIdWO ${error}`,
+					500,
+					'FAILED_TO_FIND_ONE_BY_OPTIONS',
+					error,
+				);
+			});
+		return this.afterRetrieveTransformID(entity, this.service.settings.idField) as any;
+	}
+
+	/**
+	 * Finds first item by a given find options.
+	 * If entity was not found in the database - returns null.
+	 * Available Options props:
+	 * - comment
+	 * - select
+	 * - where
+	 * - relations
+	 * - relationLoadStrategy
+	 * - join
+	 * - order
+	 * - cache
+	 * - lock
+	 * - withDeleted
+	 * - loadRelationIds
+	 * - loadEagerRelations
+	 * - transaction
+	 *
+	 * @methods
+	 * @param {Context} ctx - request context
+	 * @param {Object} findOptions - find options
+	 * @returns {Promise<T | undefined>}
+	 * @memberof TypeORMDbAdapter
+	 */
+	async findOne<T extends Entity>(
+		ctx: Context,
+		findOptions?: FindOneOptions<T> | MongoFindOneOptions<T>,
+	): Promise<T | undefined> {
+		const params = this.sanitizeParams(ctx, ctx.params);
+		const entity = await this['_findOne'](findOptions)
+			.then((docs: any) => {
+				this.broker.logger.debug('Transforming findByIdWO docs...');
+				return this.transformDocuments(ctx, params, docs);
+			})
+			.catch((error: any) => {
+				this.broker.logger.error(`Failed to findByIdWO ${error}`);
+				new Errors.MoleculerServerError(
+					`Failed to findByIdWO ${error}`,
+					500,
+					'FAILED_TO_FIND_ONE_BY_OPTIONS',
+					error,
+				);
+			});
+		return this.afterRetrieveTransformID(entity, this.service.settings.idField) as
+			| T
+			| undefined;
+	}
 
 	/**
 	 * Gets item by id(s). Can use find options, no where clause.

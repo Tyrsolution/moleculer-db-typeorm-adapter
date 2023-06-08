@@ -38,45 +38,6 @@ Called using this.adapter.repository
 *No input parameters.*
 
 
-
-<!-- AUTO-CONTENT-END:PROPERTIES -->
-
-<!-- AUTO-CONTENT-TEMPLATE:PROPERTIES
-{{#each this}}
-## `{{name}}` {{#each badges}}{{this}} {{/each}}
-{{#since}}
-_<sup>Since: {{this}}</sup>_
-{{/since}}
-
-{{description}}
-
-### Parameters
-| Property | Type | Default | Description |
-| -------- | ---- | ------- | ----------- |
-{{#each params}}
-| `{{name}}` | {{type}} | {{defaultValue}} | {{description}} |
-{{/each}}
-{{^params}}
-*No input parameters.*
-{{/params}}
-
-{{#returns}}
-### Results
-**Type:** {{type}}
-
-{{description}}
-{{/returns}}
-
-{{#hasExamples}}
-### Examples
-{{#each examples}}
-{{this}}
-{{/each}}
-{{/hasExamples}}
-
-{{/each}}
--->
-
 # Methods
 
 <!-- AUTO-CONTENT-START:METHODS -->
@@ -90,7 +51,6 @@ It will be called in `broker.start()` and is used internally.
 | -------- | ---- | ------- | ----------- |
 | `broker` | `ServiceBroker` | **required** |  |
 | `service` | `Service` | **required** |  |
-
 
 
 ## `connect` 
@@ -107,8 +67,6 @@ It will be called in `broker.start()` and is used internally.
 **Type:** `Promise`
 
 
-
-
 ## `disconnect` 
 
 Disconnects all connections from database and connection manager.
@@ -123,85 +81,112 @@ It will be called in `broker.stop()` and is used internally.
 **Type:** `Promise`
 
 
-
-
-## `getRepository` 
-
-Gets current entity's Repository and returns it.
-Needed for active record to work from base entity and
-Uses this.entity which could be an entity or an array of entities.
-If this._entity is an array, uses first entity in array for active record.
-Used internally by this.adapter for base conection.
-
-### Parameters
-| Property | Type | Default | Description |
-| -------- | ---- | ------- | ----------- |
-| `this` | `T` | **required** |  |
-
-### Results
-**Type:** `Repository.<Entity>`
-
-
-
-
 ## `findByIdWO` 
 
-Gets item by id. Can use find options
+Gets item by id(s). Can use find options, no where clause.
 
 ### Parameters
 | Property | Type | Default | Description |
 | -------- | ---- | ------- | ----------- |
-| `key` | `Partial.<T>` | **required** | primary column name |
-| `id` | `string`, `number` | **required** | id of entity |
+| `ctx` | `Context` | **required** | request context |
+| `key` | `Partial.<T>` | **required** | primary db id column name |
+| `id` | `string`, `number`, `Array.<string>`, `Array.<number>` | **required** | id(s) of entity |
 | `findOptions` | `Object` | **required** | find options, like relations, order, etc. No where clause |
 
 ### Results
 **Type:** `Promise.<(T|undefined)>`
 
 
-
-
 ## `findById` 
 
-Gets item by id. No find options
+Gets item by id(s). No find options can be provided
 
 ### Parameters
 | Property | Type | Default | Description |
 | -------- | ---- | ------- | ----------- |
-| `key` | `Partial.<T>` | **required** | primary column name |
-| `id` | `string`, `number` | **required** | id of entity |
+| `ctx` | `Context` | **required** | request context |
+| `key` | `Partial.<T>` | **required** | primary db id column name |
+| `id` | `string`, `number`, `Array.<string>`, `Array.<number>` | **required** | id(s) of entity |
 
 ### Results
 **Type:** `Promise.<(T|undefined)>`
 
 
+## `getPopulations` 
 
-
-## `findByIds` 
-
-Gets items by id.
+Populates entity(ies) by id(s) of another record.
 
 ### Parameters
 | Property | Type | Default | Description |
 | -------- | ---- | ------- | ----------- |
-| `key` | `Partial.<T>` | **required** | primary column name |
+| `ctx` | `Context` | **required** | Context instance. |
+| `params` | `Object` | - | Parameters. |
+
+### Results
+**Type:** `Object`, `Array.<Object>`
+
+Found entity(ies).
+
+
+## `findByIds` ![Deprecated action](https://img.shields.io/badge/status-deprecated-orange.svg) 
+
+Gets multiple items by id.
+No find options
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `ctx` | `Context` | **required** | request context |
+| `key` | `Partial.<T>` | **required** | primary db id column name |
 | `ids` | `Array.<string>`, `Array.<number>` | **required** | ids of entity |
 
 ### Results
 **Type:** `Promise.<(T|undefined)>`
 
 
+## `findByIdsWO` ![Deprecated action](https://img.shields.io/badge/status-deprecated-orange.svg) 
+
+Gets multiple items by id.
+Can use find options, no where clause.
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `ctx` | `Context` | **required** | request context |
+| `key` | `Partial.<T>` | **required** | primary db id column name |
+| `ids` | `Array.<string>`, `Array.<number>` | **required** | ids of entity |
+| `findOptions` | `Object` | **required** | find options, like relations, order, etc. No where clause |
+
+### Results
+**Type:** `Promise.<(T|undefined)>`
+
+
+## `updateById` 
+
+Update an entity by ID
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `ctx` | `Context` | **required** | request context |
+| `id` | `any` | **required** | ID of record to be updated |
+| `update` | `Object` | **required** | Object with update data |
+
+### Results
+**Type:** `Promise`
+
+- Updated record
 
 
 ## `list` 
 
-List entities by filters and pagination results.
+List entities from db using filters and pagination results.
 
 ### Parameters
 | Property | Type | Default | Description |
 | -------- | ---- | ------- | ----------- |
 | `ctx` | `Context` | **required** | Context instance. |
-| `params` | `FindManyOptions.<Object>` | - | Optional parameters. |
+| `params` | `ListParams.<Object>` | - | Optional parameters. |
 
 ### Results
 **Type:** `Object`
@@ -211,34 +196,34 @@ List of found entities and count.
 
 ## `beforeSaveTransformID` 
 
-Transforms 'idField' into expected db id field.
+Transforms user defined idField into expected db id field name.
 
 ### Parameters
 | Property | Type | Default | Description |
 | -------- | ---- | ------- | ----------- |
-| `entity` | `Object` | **required** |  |
-| `idField` | `String` | **required** |  |
+| `entity` | `Object` | **required** | Record to be saved |
+| `idField` | `String` | **required** | user defined service idField |
 
 ### Results
 **Type:** `Object`
 
-Modified entity
+- Modified entity
 
 
 ## `afterRetrieveTransformID` 
 
-Transforms db field into user defined 'idField'
+Transforms db field name into user defined idField service property
 
 ### Parameters
 | Property | Type | Default | Description |
 | -------- | ---- | ------- | ----------- |
-| `entity` | `Object` | **required** |  |
-| `idField` | `String` | **required** |  |
+| `entity` | `Object` | **required** | = Record retrieved from db |
+| `idField` | `String` | **required** | user defined service idField |
 
 ### Results
 **Type:** `Object`
 
-Modified entity
+- Modified entity
 
 
 ## `encodeID` 
@@ -254,21 +239,45 @@ Encode ID of entity.
 **Type:** `any`
 
 
+## `toMongoObjectId` 
 
-
-## `beforeQueryTransformID` 
-
-Transform idField into the name of the id field in db
+Convert id to mongodb ObjectId.
 
 ### Parameters
 | Property | Type | Default | Description |
 | -------- | ---- | ------- | ----------- |
-| `idField` | `any` | **required** |  |
+| `id` | `any` | **required** |  |
 
 ### Results
 **Type:** `any`
 
 
+## `fromMongoObjectId` 
+
+Convert mongodb ObjectId to string.
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `id` | `any` | **required** |  |
+
+### Results
+**Type:** `any`
+
+
+## `beforeQueryTransformID` 
+
+Transform user defined idField service property into the expected id field of db.
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `idField` | `any` | **required** | user defined service idField |
+
+### Results
+**Type:** `Object`
+
+- Record to be saved
 
 
 ## `decodeID` 
@@ -284,23 +293,23 @@ Decode ID of entity.
 **Type:** `any`
 
 
-
-
 ## `transformDocuments` 
 
-Transform the fetched documents
+Transform the fetched documents by converting id to user defind idField,
+filtering the fields according to the fields service property,
+and populating the document with the relations specified in the populate service property.
 
 ### Parameters
 | Property | Type | Default | Description |
 | -------- | ---- | ------- | ----------- |
-| `ctx` | `Context` | **required** |  |
-| `params` | `Object` | **required** |  |
-| `docs` | `Array`, `Object` | **required** |  |
+| `ctx` | `Context` | **required** | Context of the request |
+| `params` | `Object` | **required** | Params of the request |
+| `docs` | `Array`, `Object` | **required** | Records to be transformed |
 
 ### Results
 **Type:** `Array`, `Object`
 
-
+- Transformed records
 
 
 ## `beforeEntityChange` 
@@ -318,8 +327,6 @@ Call before entity lifecycle events
 **Type:** `Promise`
 
 
-
-
 ## `entityChanged` 
 
 Clear the cache & call entity lifecycle events
@@ -335,8 +342,6 @@ Clear the cache & call entity lifecycle events
 **Type:** `Promise`
 
 
-
-
 ## `clearCache` 
 
 Clear cached entities
@@ -350,8 +355,6 @@ Clear cached entities
 **Type:** `Promise`
 
 
-
-
 ## `filterFields` 
 
 Filter fields in the entity object
@@ -359,13 +362,13 @@ Filter fields in the entity object
 ### Parameters
 | Property | Type | Default | Description |
 | -------- | ---- | ------- | ----------- |
-| `doc` | `Object` | **required** |  |
+| `doc` | `Object` | **required** | Record to be filtered. |
 | `fields` | `Array.<String>` | **required** | Filter properties of model. |
 
 ### Results
 **Type:** `Object`
 
-
+- Filtered record
 
 
 ## `excludeFields` 
@@ -375,45 +378,49 @@ Exclude fields in the entity object
 ### Parameters
 | Property | Type | Default | Description |
 | -------- | ---- | ------- | ----------- |
-| `doc` | `Object` | **required** |  |
+| `doc` | `Object` | **required** | Record to be filtered. |
 | `fields` | `Array.<String>` | **required** | Exclude properties of model. |
 
 ### Results
 **Type:** `Object`
 
-
+- Recored without excluded fields
 
 
 ## `populateDocs` 
 
-Populate documents.
+Populate documents for relations.
+Used when relations between records between different databases can't be done.
+Populates the retreived record by calling service action with the `id` of the relation.
+Does not update related document at this time
 
 ### Parameters
 | Property | Type | Default | Description |
 | -------- | ---- | ------- | ----------- |
-| `ctx` | `Context` | **required** |  |
-| `docs` | `Array`, `Object` | **required** |  |
-| `populateFields` | `Array` | - |  |
+| `ctx` | `Context` | **required** | Request context |
+| `docs` | `Array`, `Object` | **required** | Records to be populated |
+| `populateFields` | `Array` | - | Fields to be populated |
 
 ### Results
 **Type:** `Promise`
 
-
+- Record with populated fields of relation
 
 
 ## `validateEntity` 
 
 Validate an entity by validator.
+Uses the `entityValidator` setting. If no validator function is supplied, returns record.
 
 ### Parameters
 | Property | Type | Default | Description |
 | -------- | ---- | ------- | ----------- |
-| `entity` | `Object` | **required** |  |
+| `entity` | `Object` | **required** | Record to be validated |
 
 ### Results
 **Type:** `Promise`
 
-
+- Validated record or unvalitaded record if no validator function is supplied.
 
 
 ## `entityToObject` 
@@ -423,43 +430,27 @@ Convert DB entity to JSON object
 ### Parameters
 | Property | Type | Default | Description |
 | -------- | ---- | ------- | ----------- |
-| `entity` | `any` | **required** |  |
+| `entity` | `any` | **required** | Record to be converted |
 
 ### Results
 **Type:** `Object`
 
-
+- JSON object of record
 
 
 ## `authorizeFields` 
 
-Authorize the required field list. Remove fields which is not exist in the `this.service.settings.fields`
+Authorize the required field list. Remove fields which does not exist in the `this.service.settings.fields`
 
 ### Parameters
 | Property | Type | Default | Description |
 | -------- | ---- | ------- | ----------- |
-| `askedFields` | `Array` | **required** |  |
+| `askedFields` | `Array` | **required** | List of fields to be authorized |
 
 ### Results
 **Type:** `Array`
 
-
-
-
-## `updateById` 
-
-Update an entity by ID
-
-### Parameters
-| Property | Type | Default | Description |
-| -------- | ---- | ------- | ----------- |
-| `id` | `any` | **required** |  |
-| `update` | `Object` | **required** |  |
-
-### Results
-**Type:** `Promise`
-
-
+- Authorized list of fields
 
 
 ## `sanitizeParams` 
@@ -469,52 +460,13 @@ Sanitize context parameters at `find` action.
 ### Parameters
 | Property | Type | Default | Description |
 | -------- | ---- | ------- | ----------- |
-| `ctx` | `Context` | **required** |  |
-| `params` | `Object` | **required** |  |
+| `ctx` | `Context` | **required** | Request context |
+| `params` | `Object` | **required** | Request parameters |
 
 ### Results
 **Type:** `Object`
 
-
-
-
-<!-- AUTO-CONTENT-END:METHODS -->
-
-<!-- AUTO-CONTENT-TEMPLATE:METHODS
-{{#each this}}
-## `{{name}}` {{#each badges}}{{this}} {{/each}}
-{{#since}}
-_<sup>Since: {{this}}</sup>_
-{{/since}}
-
-{{description}}
-
-### Parameters
-| Property | Type | Default | Description |
-| -------- | ---- | ------- | ----------- |
-{{#each params}}
-| `{{name}}` | {{type}} | {{defaultValue}} | {{description}} |
-{{/each}}
-{{^params}}
-*No input parameters.*
-{{/params}}
-
-{{#returns}}
-### Results
-**Type:** {{type}}
-
-{{description}}
-{{/returns}}
-
-{{#hasExamples}}
-### Examples
-{{#each examples}}
-{{this}}
-{{/each}}
-{{/hasExamples}}
-
-{{/each}}
--->
+- Sanitized parameters
 
 ***
 

@@ -25,41 +25,6 @@ export const TAdapterServiceSchemaMixin = (mixinOptions?: any) => {
 
 	return {
 		/**
-		 * Default settings
-		 */
-		settings: {
-			/** @type {String} Name of ID field. */
-			idField: '_id',
-
-			/** @type {Array<String>?} Field filtering list. It must be an `Array`. If the value is `null` or `undefined` doesn't filter the fields of entities. */
-			fields: null,
-
-			/** @type {Array<String>?} List of excluded fields. It must be an `Array`. The value is `null` or `undefined` will be ignored. */
-			excludeFields: null,
-
-			/** @type {Array?} Schema for population. [Read more](#populating). */
-			populates: null,
-
-			/** @type {Number} Default page size in `list` action. */
-			pageSize: 10,
-
-			/** @type {Number} Maximum page size in `list` action. */
-			maxPageSize: 100,
-
-			/** @type {Number} Maximum value of limit in `find` action. Default: `-1` (no limit) */
-			maxLimit: -1,
-
-			/** @type {Object|Function} Validator schema or a function to validate the incoming entity in `create` & 'insert' actions. */
-			entityValidator: null,
-
-			/** @type {Boolean} Whether to use dot notation or not when updating an entity. Will **not** convert Array to dot notation. Default: `false` */
-			useDotNotation: false,
-
-			/** @type {String} Type of cache clean event type. Values: "broadcast" or "emit" */
-			cacheCleanEventType: 'broadcast',
-		},
-
-		/**
 		 * Actions
 		 */
 		actions: {
