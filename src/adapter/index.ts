@@ -10,6 +10,7 @@ import {
 	capitalize,
 	cloneDeep,
 	compact,
+	defaultsDeep,
 	find,
 	flattenDeep,
 	get,
@@ -25,7 +26,7 @@ import {
 	uniq,
 	unset,
 } from 'lodash';
-import { all, method, resolve } from 'bluebird';
+import { all, method, reject, resolve } from 'bluebird';
 import { Service, ServiceBroker, Errors, Context } from 'moleculer';
 import {
 	DataSource,
@@ -40,11 +41,18 @@ import {
 	FindManyOptions,
 	FilterOperators,
 	CountOptions,
+	DeepPartial,
+	BulkWriteOptions,
+	InsertOneOptions,
+	SaveOptions,
 } from 'typeorm';
 import ConnectionManager from './connectionManager';
 import { ListParams } from '../types/typeormadapter';
 import { ObjectId } from 'mongodb';
 import { MongoFindOneOptions } from 'typeorm/find-options/mongodb/MongoFindOneOptions';
+import { flatten } from 'flat';
+import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
+const pkg = require('../package.json');
 // const type = require('typeof-items');
 
 /**
@@ -433,6 +441,107 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	}
 
 	/**
+	 * Create a new record or records.
+	 *
+	 * @methods
+	 * @param {Object | Array<Object>} entityOrEntities - record(s) to create
+	 * @param {Object?} options - Optional MongoDB insert options
+	 * @returns {Promise<Object | Array<Object>}
+	 * @memberof TypeORMDbAdapter
+	 */
+	async create<T extends Entity>(
+		ctx: Context,
+		entityOrEntities: T | T[],
+		options?: SaveOptions,
+	): Promise<any> {
+		const entity = entityOrEntities;
+		return await this.beforeEntityChange('create', entity, ctx)
+			.then(async (entity) => await this.validateEntity(entity))
+			.then((entity) => this.beforeSaveTransformID(entity, this.service.settings.idField))
+			.then(async (entity) => await this['_save'](entity, options))
+			.then(async (doc) => await this.transformDocuments(ctx, {}, doc))
+			.then(async (json) => await this.entityChanged('created', json, ctx).then(() => json));
+	}
+
+	/**
+	 * Create many new entities.
+	 *
+	 * @methods
+	 *
+	 * @param {Context} ctx - Context instance.
+	 * @param {Object?} params - Parameters.
+	 *
+	 * @returns {Object|Array.<Object>} Saved entity(ies).
+	 */
+	insert<T extends Entity>(
+		ctx: Context,
+		entityOrEntities:
+			| QueryDeepPartialEntity<T>
+			| QueryDeepPartialEntity<T>[]
+			| ObjectLiteral
+			| ObjectLiteral[],
+		options?: InsertOneOptions | BulkWriteOptions,
+	): object | Array<object> {
+		return resolve()
+			.then(() => {
+				if (isArray(entityOrEntities)) {
+					return (
+						all(
+							entityOrEntities.map((entity: any) =>
+								this.beforeEntityChange('create', entity, ctx),
+							),
+						)
+							.then((entities) => this.validateEntity(entities))
+							.then((entities) =>
+								all(
+									entities.map((entity: any) =>
+										this.beforeEntityChange('create', entity, ctx),
+									),
+								),
+							)
+							// Apply idField
+							.then((entities) => {
+								if (this.service.settings.idField === '_id') return entities;
+								return entities.map((entity) =>
+									this.beforeSaveTransformID(
+										entity,
+										this.service.settings.idField,
+									),
+								);
+							})
+							.then(async (entities) =>
+								this.opts.type !== 'mongodb'
+									? await this['_insert'](entities)
+									: await this['_insertMany'](entities, options),
+							)
+					);
+				} else if (!isArray(entityOrEntities) && isObject(entityOrEntities)) {
+					return (
+						this.beforeEntityChange('create', entityOrEntities, ctx)
+							.then((entity: any) => this.validateEntity(entity))
+							// Apply idField
+							.then((entity: any) =>
+								this.beforeSaveTransformID(entity, this.service.settings.idField),
+							)
+							.then(async (entity: any) =>
+								this.opts.type !== 'mongodb'
+									? await this['_insert'](entity)
+									: await this['_insertMany'](entity, options),
+							)
+					);
+				}
+				return reject(
+					new Errors.MoleculerClientError(
+						"Invalid request! The 'params' must contain 'entity' or 'entities'!",
+						400,
+					),
+				);
+			})
+			.then((docs) => this.transformDocuments(ctx, {}, docs))
+			.then((json) => this.entityChanged('created', json, ctx).then(() => json));
+	}
+
+	/**
 	 * Finds entities that match given find options.
 	 *
 	 * @methods
@@ -442,19 +551,18 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 * @memberof TypeORMDbAdapter
 	 */
 	async find<T extends Entity>(
-		ctx: Context,
-		findManyOptions?: FindManyOptions<T> | Partial<T> | FilterOperators<T>,
+		ctx: Context<FindManyOptions<T> | Partial<T> | FilterOperators<T>>,
 	): Promise<[T[], number]> {
 		const params = this.sanitizeParams(ctx, ctx.params);
-		const entity = await this['_find'](findManyOptions)
+		const entity = await this['_find'](params)
 			.then((docs: any) => {
-				this.broker.logger.debug('Transforming findByIdWO docs...');
+				this.broker.logger.debug('Transforming find docs...');
 				return this.transformDocuments(ctx, params, docs);
 			})
 			.catch((error: any) => {
-				this.broker.logger.error(`Failed to findByIdWO ${error}`);
+				this.broker.logger.error(`Failed to find ${error}`);
 				new Errors.MoleculerServerError(
-					`Failed to findByIdWO ${error}`,
+					`Failed to find ${error}`,
 					500,
 					'FAILED_TO_FIND_ONE_BY_OPTIONS',
 					error,
@@ -940,6 +1048,41 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	}
 
 	/**
+	 * Remove an entity by ID
+	 *
+	 * @param {any} id
+	 * @returns {Promise}
+	 * @memberof MemoryDbAdapter
+	 */
+	async removeById(id: any) {
+		const transformId: any = this.beforeQueryTransformID(id);
+		const entity =
+			this.opts.type !== 'mongodb'
+				? await this['_delete']({ [transformId]: id }).catch((error: any) => {
+						this.broker.logger.error(`Failed to updateById ${error}`);
+						new Errors.MoleculerServerError(
+							`Failed to updateById ${error}`,
+							500,
+							'FAILED_TO_UPDATE_BY_ID',
+							error,
+						);
+				  })
+				: await this['_deleteOne']({ [transformId]: this.toMongoObjectId(id) }).catch(
+						(error: any) => {
+							this.broker.logger.error(`Failed to updateById ${error}`);
+							new Errors.MoleculerServerError(
+								`Failed to updateById ${error}`,
+								500,
+								'FAILED_TO_UPDATE_BY_ID',
+								error,
+							);
+						},
+				  );
+
+		return entity;
+	}
+
+	/**
 	 * List entities from db using filters and pagination results.
 	 * @methods
 	 * @param {Context} ctx - Context instance.
@@ -947,7 +1090,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 * @returns {Object} List of found entities and count.
 	 * @memberof TypeORMDbAdapter
 	 */
-	list(ctx: any, params: ListParams): object {
+	list(ctx: Context, params: ListParams): object {
 		const sanatizedParams = this.sanitizeParams(ctx, params);
 		let countParams = Object.assign({}, sanatizedParams);
 		// Remove pagination params
@@ -1330,7 +1473,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	async entityChanged(type: string | undefined, json: any, ctx: any): Promise<any> {
 		return await this.clearCache().then(async () => {
 			const eventName = `entity${capitalize(type)}`;
-			if (this.schema[eventName] != null) {
+			if (this.service.schema[eventName] != null) {
 				return await this.service.schema[eventName].call(this, json, ctx);
 			}
 		});
@@ -1713,3 +1856,1067 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 		return p;
 	}
 }
+
+export const TAdapterServiceSchemaMixin = (mixinOptions?: any) => {
+	const mixin = defaultsDeep(
+		{
+			// Must overwrite it
+			name: '',
+
+			// Service's metadata
+			metadata: {
+				$category: 'database',
+				$description: 'Official Data Access service',
+				$official: true,
+				$package: {
+					name: pkg.name,
+					version: pkg.version,
+					repo: pkg.repository ? pkg.repository.url : null,
+				},
+			},
+
+			// Store adapter (NeDB adapter is the default)
+			adapter: null,
+
+			/**
+			 * Default settings
+			 */
+			settings: {
+				/** @type {String} Name of ID field. */
+				idField: '_id',
+
+				/** @type {Array<String>?} Field filtering list. It must be an `Array`. If the value is `null` or `undefined` doesn't filter the fields of entities. */
+				fields: null,
+
+				/** @type {Array<String>?} List of excluded fields. It must be an `Array`. The value is `null` or `undefined` will be ignored. */
+				excludeFields: null,
+
+				/** @type {Array?} Schema for population. [Read more](#populating). */
+				populates: null,
+
+				/** @type {Number} Default page size in `list` action. */
+				pageSize: 10,
+
+				/** @type {Number} Maximum page size in `list` action. */
+				maxPageSize: 100,
+
+				/** @type {Number} Maximum value of limit in `find` action. Default: `-1` (no limit) */
+				maxLimit: -1,
+
+				/** @type {Object|Function} Validator schema or a function to validate the incoming entity in `create` & 'insert' actions. */
+				entityValidator: null,
+
+				/** @type {Boolean} Whether to use dot notation or not when updating an entity. Will **not** convert Array to dot notation. Default: `false` */
+				useDotNotation: false,
+
+				/** @type {String} Type of cache clean event type. Values: "broadcast" or "emit" */
+				cacheCleanEventType: 'broadcast',
+			},
+
+			/**
+			 * Actions
+			 */
+			actions: {
+				/**
+				 * Find entities by query.
+				 *
+				 * @actions
+				 * @cached
+				 *
+				 * @param {String|Array<String>} populate - Populated fields.
+				 * @param {String|Array<String>} fields - Fields filter.
+				 * @param {String|Array<String>} excludeFields - List of excluded fields.
+				 * @param {Number?} limit - Max count of rows.
+				 * @param {Number?} offset - Count of skipped rows.
+				 * @param {String?} sort - Sorted fields.
+				 * @param {String?} search - Search text.
+				 * @param {String|Array<String>} searchFields - Fields for searching.
+				 * @param {Object?} query - Query object. Passes to adapter.
+				 *
+				 * @returns {Array<Object>} List of found entities.
+				 */
+				find: {
+					cache: {
+						keys: [
+							'populate',
+							'fields',
+							'excludeFields',
+							'limit',
+							'offset',
+							'sort',
+							'search',
+							'searchFields',
+							'query',
+						],
+					},
+					params: {
+						populate: [
+							{ type: 'string', optional: true },
+							{ type: 'array', optional: true, items: 'string' },
+						],
+						fields: [
+							{ type: 'string', optional: true },
+							{ type: 'array', optional: true, items: 'string' },
+						],
+						excludeFields: [
+							{ type: 'string', optional: true },
+							{ type: 'array', optional: true, items: 'string' },
+						],
+						take: {
+							type: 'number',
+							integer: true,
+							min: 0,
+							optional: true,
+							convert: true,
+						},
+						skip: {
+							type: 'number',
+							integer: true,
+							min: 0,
+							optional: true,
+							convert: true,
+						},
+						limit: {
+							type: 'number',
+							integer: true,
+							min: 0,
+							optional: true,
+							convert: true,
+						},
+						offset: {
+							type: 'number',
+							integer: true,
+							min: 0,
+							optional: true,
+							convert: true,
+						},
+						sort: { type: 'string', optional: true },
+						search: { type: 'string', optional: true },
+						searchFields: [
+							{ type: 'string', optional: true },
+							{ type: 'array', optional: true, items: 'string' },
+						],
+						query: [
+							{ type: 'object', optional: true },
+							{ type: 'string', optional: true },
+						],
+					},
+					handler(
+						ctx: Context<{
+							params:
+								| FindManyOptions<ObjectLiteral>
+								| Partial<ObjectLiteral>
+								| FilterOperators<ObjectLiteral>;
+						}>,
+					): any {
+						// @ts-ignore
+						let params = this.adapter.sanitizeParams(ctx, ctx.params);
+						// @ts-ignore
+						return this.adapter.find(params);
+					},
+				},
+
+				/**
+				 * Get count of entities by query.
+				 *
+				 * @actions
+				 * @cached
+				 *
+				 * @param {String?} search - Search text.
+				 * @param {String|Array<String>} searchFields - Fields list for searching.
+				 * @param {Object?} query - Query object. Passes to adapter.
+				 *
+				 * @returns {Number} Count of found entities.
+				 */
+				count: {
+					cache: {
+						keys: ['search', 'searchFields', 'query'],
+					},
+					params: {
+						options: { type: 'object', optional: true },
+						query: { type: 'object', optional: true },
+					},
+					handler(
+						ctx: Context<
+							{ options?: FindManyOptions<ObjectLiteral> | CountOptions },
+							{ query?: ObjectLiteral }
+						>,
+					): any {
+						// @ts-ignore
+						let params = this.adapter.sanitizeParams(ctx, ctx.params);
+						// @ts-ignore
+						return this.adapter.count(params);
+					},
+				},
+
+				/**
+				 * List entities by filters and pagination results.
+				 *
+				 * @actions
+				 * @cached
+				 *
+				 * @param {String|Array<String>} populate - Populated fields.
+				 * @param {String|Array<String>} fields - Fields filter.
+				 * @param {String|Array<String>} excludeFields - List of excluded fields.
+				 * @param {Number?} page - Page number.
+				 * @param {Number?} pageSize - Size of a page.
+				 * @param {String?} sort - Sorted fields.
+				 * @param {String?} search - Search text.
+				 * @param {String|Array<String>} searchFields - Fields for searching.
+				 * @param {Object?} query - Query object. Passes to adapter.
+				 *
+				 * @returns {Object} List of found entities and count with pagination info.
+				 */
+				list: {
+					cache: {
+						keys: [
+							'populate',
+							'fields',
+							'excludeFields',
+							'page',
+							'pageSize',
+							'sort',
+							'search',
+							'searchFields',
+							'query',
+						],
+					},
+					rest: 'GET /',
+					params: {
+						populate: [
+							{ type: 'string', optional: true },
+							{ type: 'array', optional: true, items: 'string' },
+						],
+						fields: [
+							{ type: 'string', optional: true },
+							{ type: 'array', optional: true, items: 'string' },
+						],
+						excludeFields: [
+							{ type: 'string', optional: true },
+							{ type: 'array', optional: true, items: 'string' },
+						],
+						page: {
+							type: 'number',
+							integer: true,
+							min: 1,
+							optional: true,
+							convert: true,
+						},
+						pageSize: {
+							type: 'number',
+							integer: true,
+							min: 0,
+							optional: true,
+							convert: true,
+						},
+						sort: { type: 'string', optional: true },
+						search: { type: 'string', optional: true },
+						searchFields: [
+							{ type: 'string', optional: true },
+							{ type: 'array', optional: true, items: 'string' },
+						],
+						query: [
+							{ type: 'object', optional: true },
+							{ type: 'string', optional: true },
+						],
+					},
+					handler(ctx: Context<{ params: ListParams }>): any {
+						// @ts-ignore
+						let sanatizedParams = this.adapter.sanitizeParams(ctx, ctx.params);
+						// @ts-ignore
+						return this.adapter.list(ctx, sanatizedParams);
+					},
+				},
+
+				/**
+				 * Create a new entity.
+				 *
+				 * @actions
+				 *
+				 * @param {Object | Array<Object>} entityOrEntities - Entity to save.
+				 * @param {Object} options - Optional MongoDb insert options.
+				 *
+				 * @returns {Object} Saved entity.
+				 */
+				create: {
+					rest: 'POST /',
+					params: {
+						entityOrEntities: [{ type: 'object' }, { type: 'array' }],
+						options: { type: 'object', optional: true },
+					},
+					handler(ctx: Context): any {
+						// @ts-ignore
+						let params = this.adapter.sanitizeParams(ctx, ctx.params);
+						const { entityOrEntities, options } = params;
+						// @ts-ignore
+						return this.adapter.create(ctx, entityOrEntities, options);
+					},
+				},
+
+				/**
+				 * Create many new entities.
+				 *
+				 * @actions
+				 *
+				 * @param {Object?} entity - Entity to save.
+				 * @param {Array<Object>?} entities - Entities to save.
+				 *
+				 * @returns {Object|Array<Object>} Saved entity(ies).
+				 */
+				insert: {
+					params: {
+						entityOrEntities: [{ type: 'object' }, { type: 'array' }],
+						options: { type: 'object', optional: true },
+					},
+					handler(ctx: Context): any {
+						// @ts-ignore
+						return this.adapter.insert(ctx, ctx.params);
+					},
+				},
+
+				/**
+				 * Get entity by ID.
+				 *
+				 * @actions
+				 * @cached
+				 *
+				 * @param {any|Array<any>} id - ID(s) of entity.
+				 * @param {String|Array<String>} populate - Field list for populate.
+				 * @param {String|Array<String>} fields - Fields filter.
+				 * @param {String|Array<String>} excludeFields - List of excluded fields.
+				 * @param {Boolean?} mapping - Convert the returned `Array` to `Object` where the key is the value of `id`.
+				 *
+				 * @returns {Object|Array<Object>} Found entity(ies).
+				 *
+				 * @throws {EntityNotFoundError} - 404 Entity not found
+				 */
+				get: {
+					cache: {
+						keys: ['id', 'populate', 'fields', 'excludeFields', 'mapping'],
+					},
+					rest: 'GET /:id',
+					params: {
+						id: [{ type: 'string' }, { type: 'number' }, { type: 'array' }],
+						populate: [
+							{ type: 'string', optional: true },
+							{ type: 'array', optional: true, items: 'string' },
+						],
+						fields: [
+							{ type: 'string', optional: true },
+							{ type: 'array', optional: true, items: 'string' },
+						],
+						excludeFields: [
+							{ type: 'string', optional: true },
+							{ type: 'array', optional: true, items: 'string' },
+						],
+						mapping: { type: 'boolean', optional: true },
+					},
+					handler(ctx: Context): any {
+						// @ts-ignore
+						let params = this.adapter.sanitizeParams(ctx, ctx.params);
+						// @ts-ignore
+						return this.adapter.findByIdWO(ctx, null, params);
+					},
+				},
+
+				/**
+				 * Update an entity by ID.
+				 * > After update, clear the cache & call lifecycle events.
+				 *
+				 * @actions
+				 *
+				 * @param {any} id - ID of entity.
+				 * @returns {Object} Updated entity.
+				 *
+				 * @throws {EntityNotFoundError} - 404 Entity not found
+				 */
+				update: {
+					rest: 'PUT /:id',
+					params: {
+						id: { type: 'any' },
+					},
+					handler(ctx: Context): any {
+						// @ts-ignore
+						return this.adapter.update(ctx, null, ctx.params);
+					},
+				},
+
+				/**
+				 * Remove an entity by ID.
+				 *
+				 * @actions
+				 *
+				 * @param {any} id - ID of entity.
+				 * @returns {Number} Count of removed entities.
+				 *
+				 * @throws {EntityNotFoundError} - 404 Entity not found
+				 */
+				remove: {
+					rest: 'DELETE /:id',
+					params: {
+						id: { type: 'any' },
+						options: { type: 'object', optional: true },
+					},
+					handler(ctx: Context): any {
+						// @ts-ignore
+						return this.adapter.remove(ctx, null, ctx.params);
+					},
+				},
+			},
+
+			/**
+			 * Methods
+			 */
+			methods: {
+				/**
+				 * Connect to database.
+				 */
+				connect(): any {
+					// @ts-ignore
+					return this.adapter.connect().then(() => {
+						// Call an 'afterConnected' handler in schema
+						// @ts-ignore
+						if (isFunction(this.schema.afterConnected)) {
+							try {
+								// @ts-ignore
+								return this.schema.afterConnected.call(this);
+							} catch (err) {
+								/* istanbul ignore next */
+								// @ts-ignore
+								this.logger.error('afterConnected error!', err);
+							}
+						}
+					});
+				},
+
+				/**
+				 * Disconnect from database.
+				 */
+				disconnect(): any {
+					// @ts-ignore
+					if (isFunction(this.adapter.disconnect)) return this.adapter.disconnect();
+				},
+
+				/**
+				 * Sanitize context parameters at `find` action.
+				 *
+				 * @methods
+				 *
+				 * @param {Context} ctx - Request context
+				 * @param {Object} params - Request parameters
+				 * @returns {Object} - Sanitized parameters
+				 * @memberof TypeORMDbAdapter
+				 */
+				sanitizeParams(ctx: any, params: any) {
+					// @ts-ignore
+					this.adapter.sanitizeParams(ctx, ctx.params);
+				},
+
+				/**
+				 * Get entity(ies) by ID(s).
+				 *
+				 * @methods
+				 * @param {any|Array<any>} id - ID or IDs.
+				 * @param {Boolean?} decoding - Need to decode IDs.
+				 * @returns {Object|Array<Object>} Found entity(ies).
+				 */
+				getById(
+					ctx: Context,
+					// @ts-ignore
+					key: string | undefined | null = this.settings.idField,
+					id: string | any[],
+					decoding: boolean,
+				): any {
+					return resolve().then(() => {
+						// @ts-ignore
+						return this.adapter.findById(
+							ctx,
+							key,
+							// @ts-ignore
+							decoding ? this.adapter.decodeID(id) : id,
+						);
+					});
+				},
+
+				/**
+				 * Call before entity lifecycle events
+				 *
+				 * @methods
+				 * @param {String} type
+				 * @param {Object} entity
+				 * @param {Context} ctx
+				 * @returns {Promise}
+				 */
+				beforeEntityChange(type: string | undefined, entity: any, ctx: any): any {
+					/* const eventName = `beforeEntity${capitalize(type)}`;
+					// @ts-ignore
+					if (this.schema[eventName] == null) {
+						return resolve(entity);
+					}
+					// @ts-ignore
+					return resolve(this.schema[eventName].call(this, entity, ctx)); */
+					// @ts-ignore
+					return this.adapter.beforeEntityChange(type, entity, ctx);
+				},
+
+				/**
+				 * Clear the cache & call entity lifecycle events
+				 *
+				 * @methods
+				 * @param {String} type
+				 * @param {Object|Array<Object>|Number} json
+				 * @param {Context} ctx
+				 * @returns {Promise}
+				 */
+				entityChanged(type: string | undefined, json: any, ctx: any): any {
+					// @ts-ignore
+					return this.adapter.entityChanged(type, json, ctx);
+				},
+
+				/**
+				 * Clear cached entities
+				 *
+				 * @methods
+				 * @returns {Promise}
+				 */
+				clearCache(): any {
+					// @ts-ignore
+					this.broker[this.settings.cacheCleanEventType](`cache.clean.${this.fullName}`);
+					// @ts-ignore
+					if (this.broker.cacher) return this.broker.cacher.clean(`${this.fullName}.**`);
+					return resolve();
+				},
+
+				/**
+				 * Transform the fetched documents
+				 * @methods
+				 * @param {Context} ctx
+				 * @param {Object} 	params
+				 * @param {Array|Object} docs
+				 * @returns {Array|Object}
+				 */
+				transformDocuments(ctx: Context, params: any, docs: any): any {
+					// @ts-ignore
+					return this.adapter.transformDocuments(ctx, params, docs);
+				},
+
+				/**
+				 * Filter fields in the entity object
+				 *
+				 * @param {Object} 	doc
+				 * @param {Array<String>} 	fields	Filter properties of model.
+				 * @returns	{Object}
+				 */
+				filterFields(doc: any, fields: any): any {
+					// @ts-ignore
+					return this.adapter.filterFields(doc, fields);
+				},
+
+				/**
+				 * Exclude fields in the entity object
+				 *
+				 * @param {Object} 	doc
+				 * @param {Array<String>} 	fields	Exclude properties of model.
+				 * @returns	{Object}
+				 */
+				excludeFields(doc: any, fields: string | any[]): any {
+					// @ts-ignore
+					return this.adapter.excludeFields(doc, fields);
+				},
+
+				/**
+				 * Authorize the required field list. Remove fields which is not exist in the `this.settings.fields`
+				 *
+				 * @param {Array} askedFields
+				 * @returns {Array}
+				 */
+				authorizeFields(askedFields: any): any {
+					// @ts-ignore
+					return this.adapter.authorizeFields(askedFields);
+				},
+
+				/**
+				 * Populate documents.
+				 *
+				 * @param {Context} 		ctx
+				 * @param {Array|Object} 	docs
+				 * @param {Array?}			populateFields
+				 * @returns	{Promise}
+				 */
+				populateDocs(ctx: Context, docs: any, populateFields: any) {
+					// @ts-ignore
+					return this.adapter.populateDocs(ctx, docs, populateFields);
+				},
+
+				/**
+				 * Validate an entity by validator.
+				 * @methods
+				 * @param {Object} entity
+				 * @returns {Promise}
+				 */
+				validateEntity(entity: any) {
+					// @ts-ignore
+					return this.adapter.validateEntity(entity);
+				},
+
+				/**
+				 * Encode ID of entity.
+				 *
+				 * @methods
+				 * @param {any} id
+				 * @returns {any}
+				 */
+				encodeID(id: any): any {
+					// @ts-ignore
+					return this.adapter.encodeID(id);
+				},
+
+				/**
+				 * Decode ID of entity.
+				 *
+				 * @methods
+				 * @param {any} id
+				 * @returns {any}
+				 */
+				decodeID(id: any): any {
+					// @ts-ignore
+					return this.adapter.decodeID(id);
+				},
+
+				/**
+				 * Find entities by query.
+				 *
+				 * @methods
+				 *
+				 * @param {Context} ctx - Context instance.
+				 * @param {Object?} params - Parameters.
+				 *
+				 * @returns {Array<Object>} List of found entities.
+				 */
+				_find(ctx: Context, params: any): Array<object> {
+					// @ts-ignore
+					return this.adapter
+						.find(ctx, params)
+						.then((docs: any[]) => this.transformDocuments(ctx, params, docs));
+				},
+
+				/**
+				 * Get count of entities by query.
+				 *
+				 * @methods
+				 *
+				 * @param {Context} ctx - Context instance.
+				 * @param {Object?} params - Parameters.
+				 *
+				 * @returns {Number} Count of found entities.
+				 */
+				_count(ctx: Context, params: any): number {
+					// Remove pagination params
+					if (params && params.limit) params.limit = null;
+					if (params && params.offset) params.offset = null;
+					// @ts-ignore
+					return this.adapter.count(params);
+				},
+
+				/**
+				 * List entities by filters and pagination results.
+				 *
+				 * @methods
+				 *
+				 * @param {Context} ctx - Context instance.
+				 * @param {Object?} params - Parameters.
+				 *
+				 * @returns {Object} List of found entities and count.
+				 */
+				_list(ctx: Context, params: ListParams): any {
+					// @ts-ignore
+					this.adapter.list(ctx, params);
+				},
+
+				/**
+				 * Create a new entity.
+				 *
+				 * @methods
+				 *
+				 * @param {Context} ctx - Context instance.
+				 * @param {Object?} params - Parameters.
+				 *
+				 * @returns {Object} Saved entity.
+				 */
+				_create(ctx: Context, params: any): any {
+					let entity = params;
+					return (
+						// @ts-ignore
+						this.adapter
+							.beforeEntityChange('create', entity, ctx)
+							// @ts-ignore
+							.then((entity: any) => this.adapter.validateEntity(entity))
+							// Apply idField
+							.then((entity: any) =>
+								// @ts-ignore
+								this.adapter.beforeSaveTransformID(entity, this.settings.idField),
+							)
+							// @ts-ignore
+							.then((entity: any) => this.adapter.insert(entity))
+							// @ts-ignore
+							.then((doc: any) => this.adapter.transformDocuments(ctx, {}, doc))
+							.then((json: any) =>
+								// @ts-ignore
+								this.adapter.entityChanged('created', json, ctx).then(() => json),
+							)
+					);
+				},
+
+				/**
+				 * Create many new entities.
+				 *
+				 * @methods
+				 *
+				 * @param {Context} ctx - Context instance.
+				 * @param {Object?} params - Parameters.
+				 *
+				 * @returns {Object|Array.<Object>} Saved entity(ies).
+				 */
+				_insert(ctx: Context, params: any): object | Array<object> {
+					return (
+						Promise.resolve()
+							.then(() => {
+								if (Array.isArray(params.entities)) {
+									return (
+										Promise.all(
+											params.entities.map((entity: any) =>
+												// @ts-ignore
+												this.adapter.beforeEntityChange(
+													'create',
+													entity,
+													ctx,
+												),
+											),
+										)
+											// @ts-ignore
+											.then((entities) =>
+												// @ts-ignore
+												this.adapter.validateEntity(entities),
+											)
+											.then((entities) =>
+												Promise.all(
+													entities.map((entity: any) =>
+														// @ts-ignore
+														this.adapter.beforeEntityChange(
+															'create',
+															entity,
+															ctx,
+														),
+													),
+												),
+											)
+											// Apply idField
+											.then((entities) => {
+												// @ts-ignore
+												if (this.settings.idField === '_id')
+													return entities;
+												return entities.map((entity) =>
+													// @ts-ignore
+													this.adapter.beforeSaveTransformID(
+														entity,
+														// @ts-ignore
+														this.settings.idField,
+													),
+												);
+											})
+											// @ts-ignore
+											.then((entities) => this.adapter.insertMany(entities))
+									);
+								} else if (params.entity) {
+									return (
+										// @ts-ignore
+										this.adapter
+											.beforeEntityChange('create', params.entity, ctx)
+											// @ts-ignore
+											.then((entity: any) =>
+												// @ts-ignore
+												this.adapter.validateEntity(entity),
+											)
+											// Apply idField
+											.then((entity: any) =>
+												// @ts-ignore
+												this.adapter.beforeSaveTransformID(
+													entity,
+													// @ts-ignore
+													this.settings.idField,
+												),
+											)
+											// @ts-ignore
+											.then((entity: any) => this.adapter.insert(entity))
+									);
+								}
+								return Promise.reject(
+									new Errors.MoleculerClientError(
+										"Invalid request! The 'params' must contain 'entity' or 'entities'!",
+										400,
+									),
+								);
+							})
+							// @ts-ignore
+							.then((docs) => this.adapter.transformDocuments(ctx, {}, docs))
+							.then((json) =>
+								// @ts-ignore
+								this.adapter.entityChanged('created', json, ctx).then(() => json),
+							)
+					);
+				},
+
+				/**
+				 * Get entity by ID.
+				 *
+				 * @methods
+				 *
+				 * @param {Context} ctx - Context instance.
+				 * @param {Object?} params - Parameters.
+				 *
+				 * @returns {Object|Array<Object>} Found entity(ies).
+				 *
+				 * @throws {EntityNotFoundError} - 404 Entity not found
+				 */
+				_get(
+					ctx: Context,
+					// @ts-ignore
+					key: string | undefined | null = this.settings.idField,
+					params: any,
+				): object | Array<object> {
+					let id = params.id;
+					let origDoc: any;
+					let shouldMapping = params.mapping === true;
+					return this.getById(ctx, key, id, true)
+						.then((doc: any) => {
+							if (!doc)
+								return Promise.reject(
+									new Errors.MoleculerClientError(
+										'Entity not found',
+										400,
+										'',
+										id,
+									),
+								);
+
+							if (shouldMapping)
+								origDoc = isArray(doc)
+									? doc.map((d) => cloneDeep(d))
+									: cloneDeep(doc);
+							else origDoc = doc;
+							// @ts-ignore
+							return this.adapter.transformDocuments(ctx, params, doc);
+						})
+						.then((json: any) => {
+							if (params.mapping !== true) return json;
+
+							let res: { [key: string]: any } = {};
+							if (isArray(json)) {
+								json.forEach((doc, i) => {
+									// @ts-ignore
+									const id = this.adapter.encodeID(
+										// @ts-ignore
+										this.adapter.afterRetrieveTransformID(
+											origDoc[i],
+											// @ts-ignore
+											this.settings.idField,
+											// @ts-ignore
+										)[this.settings.idField],
+									);
+									res[id] = doc;
+								});
+							} else if (isObject(json)) {
+								// @ts-ignore
+								const id = this.adapter.encodeID(
+									// @ts-ignore
+									this.adapter.afterRetrieveTransformID(
+										origDoc,
+										// @ts-ignore
+										this.settings.idField,
+										// @ts-ignore
+									)[this.settings.idField],
+								);
+								res[id] = json;
+							}
+							return res;
+						});
+				},
+
+				/**
+				 * Update an entity by ID.
+				 * > After update, clear the cache & call lifecycle events.
+				 *
+				 * @methods
+				 *
+				 * @param {Context} ctx - Context instance.
+				 * @param {Object?} params - Parameters.
+				 * @returns {Object} Updated entity.
+				 *
+				 * @throws {EntityNotFoundError} - 404 Entity not found
+				 */
+				_update(ctx: Context, params: any): any {
+					let id: any;
+
+					return (
+						Promise.resolve()
+							// @ts-ignore
+							.then(() => this.adapter.beforeEntityChange('update', params, ctx))
+							.then((params) => {
+								let sets: { [key: string]: any } = {};
+								// Convert fields from params to "$set" update object
+								Object.keys(params).forEach((prop) => {
+									// @ts-ignore
+									if (prop == 'id' || prop == this.settings.idField)
+										// @ts-ignore
+										id = this.adapter.decodeID(params[prop]);
+									else sets[prop] = params[prop];
+								});
+								// @ts-ignore
+								if (this.settings.useDotNotation)
+									sets = flatten(sets, { safe: true });
+
+								return sets;
+							})
+							// @ts-ignore
+							.then((sets) => this.adapter.updateById(id, { $set: sets }))
+							.then((doc) => {
+								if (!doc)
+									return Promise.reject(
+										new Errors.MoleculerClientError(
+											'Entity not found',
+											400,
+											'',
+											id,
+										),
+									);
+								// @ts-ignore
+								return this.adapter
+									.transformDocuments(ctx, {}, doc)
+									.then((json: any) =>
+										// @ts-ignore
+										this.adapter
+											.entityChanged('updated', json, ctx)
+											.then(() => json),
+									);
+							})
+					);
+				},
+
+				/**
+				 * Remove an entity by ID.
+				 *
+				 * @methods
+				 *
+				 * @param {Context} ctx - Context instance.
+				 * @param {Object?} params - Parameters.
+				 *
+				 * @throws {EntityNotFoundError} - 404 Entity not found
+				 */
+				_remove(ctx: Context, params: any): any {
+					// @ts-ignore
+					const id = this.adapter.decodeID(params.id);
+					return (
+						Promise.resolve()
+							// @ts-ignore
+							.then(() => this.adapter.beforeEntityChange('remove', params, ctx))
+							// @ts-ignore
+							.then(() => this.adapter.removeById(id))
+							.then((doc) => {
+								if (!doc)
+									return Promise.reject(
+										new Errors.MoleculerClientError(
+											'Entity not found',
+											400,
+											'',
+											params.id,
+										),
+									);
+								// @ts-ignore
+								return this.adapter
+									.transformDocuments(ctx, {}, doc)
+									.then((json: any) =>
+										// @ts-ignore
+										this.adapter
+											.entityChanged('removed', json, ctx)
+											.then(() => json),
+									);
+							})
+					);
+				},
+			},
+
+			/**
+			 * Service created lifecycle event handler
+			 */
+			created() {
+				// Compatibility with < 0.4
+				if (isString(this.settings.fields)) {
+					this.settings.fields = this.settings.fields.split(/\s+/);
+				}
+
+				if (isString(this.settings.excludeFields)) {
+					this.settings.excludeFields = this.settings.excludeFields.split(/\s+/);
+				}
+
+				// if (!this.schema.adapter) this.adapter = new MemoryAdapter();
+				// else this.adapter = this.schema.adapter;
+				else this.adapter = this.schema.adapter;
+
+				this.adapter.init(this.broker, this);
+
+				// Transform entity validation schema to checker function
+				if (
+					this.broker.validator &&
+					isObject(this.settings.entityValidator) &&
+					!isFunction(this.settings.entityValidator)
+				) {
+					const check = this.broker.validator.compile(this.settings.entityValidator);
+					this.settings.entityValidator = async (entity: any) => {
+						let res = check(entity);
+						if (check.async === true || res.then instanceof Function) res = await res;
+						if (res === true) return Promise.resolve();
+						else
+							return Promise.reject(
+								new Errors.ValidationError('Entity validation error!', '', res),
+							);
+					};
+				}
+			},
+
+			/**
+			 * Service started lifecycle event handler
+			 */
+			started() {
+				if (this.adapter) {
+					return new Promise((resolve) => {
+						let connecting = () => {
+							this.connect()
+								.then(resolve)
+								.catch((err: any) => {
+									this.logger.error('Connection error!', err);
+									setTimeout(() => {
+										this.logger.warn('Reconnecting...');
+										connecting();
+									}, 1000);
+								});
+						};
+
+						connecting();
+					});
+				}
+
+				/* istanbul ignore next */
+				return Promise.reject(new Error('Please set the store adapter in schema!'));
+			},
+
+			/**
+			 * Service stopped lifecycle event handler
+			 */
+			stopped() {
+				if (this.adapter) return this.adapter.disconnect();
+			},
+		},
+		mixinOptions,
+	);
+	return mixin;
+};

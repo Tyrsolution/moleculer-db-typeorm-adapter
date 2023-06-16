@@ -3,7 +3,7 @@
  * Copyright (c) 2023 TyrSolutions (https://github.com/Tyrsolution/moleculer-db-typeorm-adapter)
  * MIT Licensed
  */
-import { Context, Service, ServiceBroker } from 'moleculer';
+import { Context, Service, ServiceBroker, ServiceSchema } from 'moleculer';
 import {
 	AggregateOptions,
 	AggregationCursor,
@@ -2009,3 +2009,5 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	 */
 	updateById(ctx: Context, id: any, update: any): Promise<any>;
 }
+
+export function TAdapterServiceSchemaMixin(mixinOptions?: any): ServiceSchema;

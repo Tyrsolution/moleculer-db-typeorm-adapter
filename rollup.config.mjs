@@ -14,6 +14,7 @@ export default () => {
 			sourcemap: false,
 			format: 'cjs',
 			file: pkg.main,
+			exports: 'named',
 		},
 		plugins: [
 			json(),
