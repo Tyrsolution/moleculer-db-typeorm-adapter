@@ -17,6 +17,7 @@ import {
 	has,
 	isArray,
 	isFunction,
+	isNull,
 	isObject,
 	isString,
 	isUndefined,
@@ -456,11 +457,32 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	): Promise<any> {
 		const entity = entityOrEntities;
 		return await this.beforeEntityChange('create', entity, ctx)
-			.then(async (entity) => await this.validateEntity(entity))
-			.then((entity) => this.beforeSaveTransformID(entity, this.service.settings.idField))
-			.then(async (entity) => await this['_save'](entity, options))
-			.then(async (doc) => await this.transformDocuments(ctx, {}, doc))
-			.then(async (json) => await this.entityChanged('created', json, ctx).then(() => json));
+			.then(async (entity) => {
+				this.broker.logger.debug(`Validating entity to create: ${entity}`);
+				return await this.validateEntity(entity);
+			})
+			.then((entity) => {
+				this.broker.logger.debug('Transforming entity id...');
+				return this.beforeSaveTransformID(entity, this.service.settings.idField);
+			})
+			.then(async (entity) => {
+				this.broker.logger.debug(`Attempting to create entity: ${entity}`);
+				return await this['_save'](entity, options);
+			})
+			.then(async (doc) => {
+				this.broker.logger.debug('Transforming created entity...');
+				return await this.transformDocuments(ctx, {}, doc);
+			})
+			.then(async (json) => await this.entityChanged('created', json, ctx).then(() => json))
+			.catch((err: any) => {
+				this.broker.logger.error(`Failed to create entity: ${err}`);
+				new Errors.MoleculerServerError(
+					`Failed to create entity: ${entity}`,
+					500,
+					'FAILED_TO_CREATE_ENTITY',
+					err,
+				);
+			});
 	}
 
 	/**
@@ -491,7 +513,12 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 								this.beforeEntityChange('create', entity, ctx),
 							),
 						)
-							.then((entities) => this.validateEntity(entities))
+							.then((entities) => {
+								this.broker.logger.debug(
+									`Validating entities to create: ${entities}`,
+								);
+								return this.validateEntity(entities);
+							})
 							.then((entities) =>
 								all(
 									entities.map((entity: any) =>
@@ -502,17 +529,24 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 							// Apply idField
 							.then((entities) => {
 								if (this.service.settings.idField === '_id') return entities;
-								return entities.map((entity) =>
-									this.beforeSaveTransformID(
+								return entities.map((entity) => {
+									this.broker.logger.debug('Transforming entity id...');
+									return this.beforeSaveTransformID(
 										entity,
 										this.service.settings.idField,
-									),
-								);
+									);
+								});
 							})
 							.then(async (entities) =>
 								this.opts.type !== 'mongodb'
-									? await this['_insert'](entities)
-									: await this['_insertMany'](entities, options),
+									? (this.broker.logger.debug(
+											`Attempting to create entities: ${entities}`,
+									  ),
+									  await this['_insert'](entities))
+									: (this.broker.logger.debug(
+											`Attempting to create mongodb entities: ${entities}`,
+									  ),
+									  await this['_insertMany'](entities, options)),
 							)
 					);
 				} else if (!isArray(entityOrEntities) && isObject(entityOrEntities)) {
@@ -525,14 +559,20 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 							)
 							.then(async (entity: any) =>
 								this.opts.type !== 'mongodb'
-									? await this['_insert'](entity)
-									: await this['_insertMany'](entity, options),
+									? (this.broker.logger.debug(
+											`Attempting to create entity: ${entity}`,
+									  ),
+									  await this['_insert'](entity))
+									: (this.broker.logger.debug(
+											`Attempting to create mongodb entity: ${entity}`,
+									  ),
+									  await this['_insertOne'](entity, options)),
 							)
 					);
 				}
 				return reject(
 					new Errors.MoleculerClientError(
-						"Invalid request! The 'params' must contain 'entity' or 'entities'!",
+						"Invalid request! The 'params' must contain 'entityOrEntities'!",
 						400,
 					),
 				);
@@ -1014,9 +1054,32 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	async updateById(ctx: Context, id: any, update: any): Promise<any> {
 		const transformId: any = this.beforeQueryTransformID(id);
 		const params = this.sanitizeParams(ctx, ctx.params);
-		const entity =
-			this.opts.type !== 'mongodb'
-				? await this['_update']({ [transformId]: id }, update)
+		const entity = this.beforeEntityChange('update', update, ctx)
+			.then(
+				async (entity) =>
+					await this['_update'](
+						{
+							[transformId]:
+								this.opts.type !== 'mongodb' ? id : this.toMongoObjectId(id),
+						},
+						entity,
+					),
+			)
+			.then((docs: any) => {
+				this.broker.logger.debug('Transforming updateById docs...');
+				return this.transformDocuments(ctx, params, docs);
+			})
+			.then((json) => this.entityChanged('updated', json, ctx).then(() => json))
+			.catch((error: any) => {
+				this.broker.logger.error(`Failed to updateById ${error}`);
+				new Errors.MoleculerServerError(
+					`Failed to updateById ${error}`,
+					500,
+					'FAILED_TO_UPDATE_BY_ID',
+					error,
+				);
+			});
+		/* : await this['_update']({ [transformId]: this.toMongoObjectId(id) }, update)
 						.then((docs: any) => {
 							this.broker.logger.debug('Transforming updateById docs...');
 							return this.transformDocuments(ctx, params, docs);
@@ -1029,22 +1092,65 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 								'FAILED_TO_UPDATE_BY_ID',
 								error,
 							);
-						})
-				: await this['_update']({ [transformId]: this.toMongoObjectId(id) }, update)
-						.then((docs: any) => {
-							this.broker.logger.debug('Transforming updateById docs...');
-							return this.transformDocuments(ctx, params, docs);
-						})
-						.catch((error: any) => {
-							this.broker.logger.error(`Failed to updateById ${error}`);
-							new Errors.MoleculerServerError(
-								`Failed to updateById ${error}`,
-								500,
-								'FAILED_TO_UPDATE_BY_ID',
-								error,
-							);
-						});
+						}); */
 		return this.afterRetrieveTransformID(entity, this.service.settings.idField);
+	}
+
+	/**
+	 * Update an entity by ID
+	 * @methods
+	 * @param {Context} ctx - request context
+	 * @param {Object} update - Object with update data
+	 * @returns {Promise} - Updated record
+	 * @memberof TypeORMDbAdapter
+	 */
+	async update(ctx: Context, update: any): Promise<any> {
+		let id: any;
+		const params = this.sanitizeParams(ctx, update);
+		return await this.beforeEntityChange('update', update, ctx)
+			.then((update) => {
+				let sets: { [key: string]: any } = {};
+				// Convert fields from params to "$set" update object
+				Object.keys(update).forEach((prop) => {
+					if (prop == 'id' || prop == this.service.settings.idField) {
+						id = this.decodeID(update[prop]);
+					} else {
+						sets[prop] = update[prop];
+					}
+				});
+				if (this.service.settings.useDotNotation) sets = flatten(sets, { safe: true });
+				return sets;
+			})
+			.then(async (entity) => {
+				this.broker.logger.debug(
+					`Updating entity by ID '${id}' with ${JSON.stringify(entity)}`,
+				);
+				const updatedColumn: any =
+					this.repository!.metadata.ownColumns[0].entityMetadata.updateDateColumn;
+				if (!isUndefined(updatedColumn) && this.opts.type === 'mongodb') {
+					entity[updatedColumn!.propertyName] = new Date();
+				}
+				return await this['_update'](
+					this.opts.type !== 'mongodb' ? id : this.toMongoObjectId(id),
+					entity,
+				);
+			})
+			.then(async (docs: any) => {
+				this.broker.logger.debug(`Updated entity by ID '${id}': ${docs}`);
+				const entity = await this.findById(ctx, null, id);
+				this.broker.logger.debug('Transforming update docs...');
+				return this.transformDocuments(ctx, params, entity);
+			})
+			.then((json) => this.entityChanged('updated', json, ctx).then(() => json))
+			.catch((error: any) => {
+				this.broker.logger.error(`Failed to update: ${error}`);
+				new Errors.MoleculerServerError(
+					`Failed to update ${error}`,
+					500,
+					'FAILED_TO_UPDATE',
+					error,
+				);
+			});
 	}
 
 	/**
@@ -2170,7 +2276,10 @@ export const TAdapterServiceSchemaMixin = (mixinOptions?: any) => {
 					},
 					handler(ctx: Context): any {
 						// @ts-ignore
-						return this.adapter.insert(ctx, ctx.params);
+						let params = this.adapter.sanitizeParams(ctx, ctx.params);
+						const { entityOrEntities, options } = params;
+						// @ts-ignore
+						return this.adapter.insert(ctx, entityOrEntities, options);
 					},
 				},
 
@@ -2237,7 +2346,7 @@ export const TAdapterServiceSchemaMixin = (mixinOptions?: any) => {
 					},
 					handler(ctx: Context): any {
 						// @ts-ignore
-						return this.adapter.update(ctx, null, ctx.params);
+						return this.adapter.update(ctx, ctx.params);
 					},
 				},
 
