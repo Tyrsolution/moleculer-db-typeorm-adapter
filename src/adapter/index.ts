@@ -438,25 +438,14 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 		entityOrEntities: T | T[],
 		options?: SaveOptions,
 	): Promise<any> {
-		const entity = entityOrEntities;
-		return await this.beforeEntityChange('create', entity, ctx)
-			.then(async (entity) => {
-				this.broker.logger.debug(`Validating entity to create: ${entity}`);
-				return await this.validateEntity(entity);
-			})
-			.then((entity) => {
-				this.broker.logger.debug('Transforming entity id...');
-				return this.beforeSaveTransformID(entity, this.service.settings.idField);
-			})
-			.then(async (entity) => {
-				this.broker.logger.debug(`Attempting to create entity: ${entity}`);
-				return await this['_save'](entity, options);
-			})
-			.then(async (doc) => {
+		this.broker.logger.debug('Transforming entity id...');
+		const entity = this.beforeSaveTransformID(entityOrEntities, this.service.settings.idField);
+		this.broker.logger.debug(`Attempting to create entity: ${entity}`);
+		return await this['_save'](entity, options)
+			.then(async (doc: any) => {
 				this.broker.logger.debug('Transforming created entity...');
-				return await this.transformDocuments(ctx, {}, doc);
+				return await this.transformDocuments(ctx, ctx.params, doc);
 			})
-			.then(async (json) => await this.entityChanged('created', json, ctx).then(() => json))
 			.catch((err: any) => {
 				this.broker.logger.error(`Failed to create entity: ${err}`);
 				new Errors.MoleculerServerError(
@@ -575,34 +564,25 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 */
 	async updateById(ctx: Context, id: any, update: any): Promise<any> {
 		const transformId: any = this.beforeQueryTransformID(id);
-		const params = this.sanitizeParams(ctx, ctx.params);
-		const entity = this.beforeEntityChange('update', update, ctx)
-			.then((entity) =>
-				this.service.settings.useDotNotation ? flatten(entity, { safe: true }) : entity,
-			)
-			.then(async (entity) => {
-				this.broker.logger.debug(
-					`Updating entity by ID '${id}' with ${JSON.stringify(entity)}`,
-				);
-				const updatedColumn: any =
-					this.repository!.metadata.ownColumns[0].entityMetadata.updateDateColumn;
-				if (!isUndefined(updatedColumn) && this.opts.type === 'mongodb') {
-					entity[updatedColumn!.propertyName] = new Date();
-				}
-				return await this['_update'](
-					{
-						[transformId]: this.opts.type !== 'mongodb' ? id : this.toMongoObjectId(id),
-					},
-					entity,
-				);
-			})
+		const params = this.sanitizeParams(ctx, update);
+		this.broker.logger.debug(`Updating entity by ID '${id}' with ${JSON.stringify(params)}`);
+		const updatedColumn: any =
+			this.repository!.metadata.ownColumns[0].entityMetadata.updateDateColumn;
+		if (!isUndefined(updatedColumn) && this.opts.type === 'mongodb') {
+			params[updatedColumn!.propertyName] = new Date();
+		}
+		const entity = await this['_update'](
+			{
+				[transformId]: this.opts.type !== 'mongodb' ? id : this.toMongoObjectId(id),
+			},
+			params,
+		)
 			.then(async (docs: any) => {
 				this.broker.logger.debug(`Updated entity by ID '${id}': ${docs}`);
 				const entity = await this.findById(ctx, null, id);
 				this.broker.logger.debug('Transforming update docs...');
 				return this.transformDocuments(ctx, params, entity);
 			})
-			.then((json) => this.entityChanged('updated', json, ctx).then(() => json))
 			.catch((error: any) => {
 				this.broker.logger.error(`Failed to updateById ${error}`);
 				new Errors.MoleculerServerError(
@@ -613,6 +593,41 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 				);
 			});
 		return this.afterRetrieveTransformID(entity, this.service.settings.idField);
+	}
+
+	/**
+	 * Remove an entity by ID
+	 *
+	 * @param {any} id
+	 * @returns {Promise}
+	 * @memberof MemoryDbAdapter
+	 */
+	async removeById(id: any) {
+		const transformId: any = this.beforeQueryTransformID(id);
+		const entity =
+			this.opts.type !== 'mongodb'
+				? await this['_delete']({ [transformId]: id }).catch((error: any) => {
+						this.broker.logger.error(`Failed to updateById ${error}`);
+						new Errors.MoleculerServerError(
+							`Failed to updateById ${error}`,
+							500,
+							'FAILED_TO_UPDATE_BY_ID',
+							error,
+						);
+				  })
+				: await this['_deleteOne']({ [transformId]: this.toMongoObjectId(id) }).catch(
+						(error: any) => {
+							this.broker.logger.error(`Failed to updateById ${error}`);
+							new Errors.MoleculerServerError(
+								`Failed to updateById ${error}`,
+								500,
+								'FAILED_TO_UPDATE_BY_ID',
+								error,
+							);
+						},
+				  );
+
+		return entity;
 	}
 
 	/**
@@ -1092,41 +1107,6 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 		return this.afterRetrieveTransformID(entity, this.service.settings.idField) as
 			| T
 			| undefined;
-	}
-
-	/**
-	 * Remove an entity by ID
-	 *
-	 * @param {any} id
-	 * @returns {Promise}
-	 * @memberof MemoryDbAdapter
-	 */
-	async removeById(id: any) {
-		const transformId: any = this.beforeQueryTransformID(id);
-		const entity =
-			this.opts.type !== 'mongodb'
-				? await this['_delete']({ [transformId]: id }).catch((error: any) => {
-						this.broker.logger.error(`Failed to updateById ${error}`);
-						new Errors.MoleculerServerError(
-							`Failed to updateById ${error}`,
-							500,
-							'FAILED_TO_UPDATE_BY_ID',
-							error,
-						);
-				  })
-				: await this['_deleteOne']({ [transformId]: this.toMongoObjectId(id) }).catch(
-						(error: any) => {
-							this.broker.logger.error(`Failed to updateById ${error}`);
-							new Errors.MoleculerServerError(
-								`Failed to updateById ${error}`,
-								500,
-								'FAILED_TO_UPDATE_BY_ID',
-								error,
-							);
-						},
-				  );
-
-		return entity;
 	}
 
 	/**
@@ -2194,9 +2174,9 @@ export const TAdapterServiceSchemaMixin = (mixinOptions?: any) => {
 					handler(ctx: Context): any {
 						// @ts-ignore
 						let params = this.adapter.sanitizeParams(ctx, ctx.params);
-						const { entityOrEntities, options } = params;
 						// @ts-ignore
-						return this.adapter.create(ctx, entityOrEntities, options);
+						// return this.adapter.create(ctx, entityOrEntities, options);
+						return this._create(ctx, params);
 					},
 				},
 
@@ -2286,75 +2266,10 @@ export const TAdapterServiceSchemaMixin = (mixinOptions?: any) => {
 						id: { type: 'any' },
 					},
 					handler(ctx: Context): any {
-						let id: any;
 						// @ts-ignore
 						const params = this.sanitizeParams(ctx, ctx.params);
 						// @ts-ignore
-						return this.adapter
-							.beforeEntityChange('update', params, ctx)
-							.then((update: any) => {
-								let sets: { [key: string]: any } = {};
-								// Convert fields from params to "$set" update object
-								Object.keys(update).forEach((prop) => {
-									// @ts-ignore
-									if (prop == 'id' || prop == this.settings.idField) {
-										// @ts-ignore
-										id = this.decodeID(update[prop]);
-									} else {
-										sets[prop] = update[prop];
-									}
-								});
-								// @ts-ignore
-								if (this.settings.useDotNotation)
-									sets = flatten(sets, { safe: true });
-								return sets;
-							})
-							.then(async (entity: any) => {
-								// @ts-ignore
-								this.logger.debug(
-									`Updating entity by ID '${id}' with ${JSON.stringify(entity)}`,
-								);
-								const updatedColumn: any =
-									// @ts-ignore
-									this.adapter.repository!.metadata.ownColumns[0].entityMetadata
-										.updateDateColumn;
-								// @ts-ignore
-								if (
-									!isUndefined(updatedColumn) &&
-									// @ts-ignore
-									this.adapter.opts.type === 'mongodb'
-								) {
-									entity[updatedColumn!.propertyName] = new Date();
-								}
-								// @ts-ignore
-								return await this.adapter.updateById(ctx, id, entity);
-							})
-							.then(async (docs: any) => {
-								// @ts-ignore
-								this.logger.debug(`Updated entity by ID '${id}': ${docs}`);
-								// @ts-ignore
-								const entity = await this.adapter.findById(ctx, null, id);
-								// @ts-ignore
-								this.logger.debug('Transforming update docs...');
-								// @ts-ignore
-								return this.transformDocuments(ctx, params, entity);
-							})
-							.then((json: any) =>
-								// @ts-ignore
-								this.adapter.entityChanged('updated', json, ctx).then(() => json),
-							)
-							.catch((error: any) => {
-								// @ts-ignore
-								this.logger.error(`Failed to update: ${error}`);
-								new Errors.MoleculerServerError(
-									`Failed to update ${error}`,
-									500,
-									'FAILED_TO_UPDATE',
-									error,
-								);
-							});
-						// @ts-ignore
-						// return this.adapter.update(ctx, ctx.params);
+						return this._update(ctx, ctx.params);
 					},
 				},
 
@@ -2661,27 +2576,38 @@ export const TAdapterServiceSchemaMixin = (mixinOptions?: any) => {
 				 * @returns {Object} Saved entity.
 				 */
 				_create(ctx: Context, params: any): any {
-					let entity = params;
-					return (
-						// @ts-ignore
-						this.adapter
-							.beforeEntityChange('create', entity, ctx)
+					const { entityOrEntities, options } = params;
+					return this.beforeEntityChange('create', entityOrEntities, ctx)
+						.then(async (entity: any) => {
 							// @ts-ignore
-							.then((entity: any) => this.adapter.validateEntity(entity))
-							// Apply idField
-							.then((entity: any) =>
-								// @ts-ignore
-								this.adapter.beforeSaveTransformID(entity, this.settings.idField),
-							)
+							this.logger.debug(`Validating entity(s) to create: ${entity}`);
+							return await this.validateEntity(entity);
+						})
+						.then(async (entity: any) => {
 							// @ts-ignore
-							.then((entity: any) => this.adapter.insert(entity))
+							this.logger.debug(`Attempting to create entity: ${entity}`);
 							// @ts-ignore
-							.then((doc: any) => this.adapter.transformDocuments(ctx, {}, doc))
-							.then((json: any) =>
-								// @ts-ignore
-								this.adapter.entityChanged('created', json, ctx).then(() => json),
-							)
-					);
+							return await this.adapter.create(ctx, entity, options);
+						})
+						.then(async (doc: any) => {
+							// @ts-ignore
+							this.logger.debug('Transforming created entity...');
+							return await this.transformDocuments(ctx, params, doc);
+						})
+						.then(
+							async (json: any) =>
+								await this.entityChanged('created', json, ctx).then(() => json),
+						)
+						.catch((err: any) => {
+							// @ts-ignore
+							this.logger.error(`Failed to create entity: ${err}`);
+							new Errors.MoleculerServerError(
+								`Failed to create entity(s): ${entityOrEntities}`,
+								500,
+								'FAILED_TO_CREATE_ENTITY',
+								err,
+							);
+						});
 				},
 
 				/**
@@ -2873,50 +2799,46 @@ export const TAdapterServiceSchemaMixin = (mixinOptions?: any) => {
 				 */
 				_update(ctx: Context, params: any): any {
 					let id: any;
-
-					return (
-						Promise.resolve()
-							// @ts-ignore
-							.then(() => this.adapter.beforeEntityChange('update', params, ctx))
-							.then((params) => {
-								let sets: { [key: string]: any } = {};
-								// Convert fields from params to "$set" update object
-								Object.keys(params).forEach((prop) => {
+					// @ts-ignore
+					return this.beforeEntityChange('update', params, ctx)
+						.then((update: any) => {
+							let sets: { [key: string]: any } = {};
+							// Convert fields from params to "$set" update object
+							Object.keys(update).forEach((prop) => {
+								// @ts-ignore
+								if (prop == 'id' || prop == this.settings.idField) {
 									// @ts-ignore
-									if (prop == 'id' || prop == this.settings.idField)
-										// @ts-ignore
-										id = this.adapter.decodeID(params[prop]);
-									else sets[prop] = params[prop];
-								});
-								// @ts-ignore
-								if (this.settings.useDotNotation)
-									sets = flatten(sets, { safe: true });
-
-								return sets;
-							})
+									id = this.decodeID(update[prop]);
+								} else {
+									sets[prop] = update[prop];
+								}
+							});
 							// @ts-ignore
-							.then((sets) => this.adapter.updateById(id, { $set: sets }))
-							.then((doc) => {
-								if (!doc)
-									return Promise.reject(
-										new Errors.MoleculerClientError(
-											'Entity not found',
-											400,
-											'',
-											id,
-										),
-									);
-								// @ts-ignore
-								return this.adapter
-									.transformDocuments(ctx, {}, doc)
-									.then((json: any) =>
-										// @ts-ignore
-										this.adapter
-											.entityChanged('updated', json, ctx)
-											.then(() => json),
-									);
-							})
-					);
+							if (this.settings.useDotNotation) sets = flatten(sets, { safe: true });
+							return sets;
+						})
+						.then(async (entity: any) => {
+							// @ts-ignore
+							this.logger.debug(
+								`Updating entity by ID '${id}' with ${JSON.stringify(entity)}`,
+							);
+							// @ts-ignore
+							return await this.adapter.updateById(ctx, id, entity);
+						})
+						.then((json: any) =>
+							// @ts-ignore
+							this.entityChanged('updated', json, ctx).then(() => json),
+						)
+						.catch((error: any) => {
+							// @ts-ignore
+							this.logger.error(`Failed to update: ${error}`);
+							new Errors.MoleculerServerError(
+								`Failed to update ${error}`,
+								500,
+								'FAILED_TO_UPDATE',
+								error,
+							);
+						});
 				},
 
 				/**
@@ -2935,7 +2857,7 @@ export const TAdapterServiceSchemaMixin = (mixinOptions?: any) => {
 					return (
 						Promise.resolve()
 							// @ts-ignore
-							.then(() => this.adapter.beforeEntityChange('remove', params, ctx))
+							.then(() => this.beforeEntityChange('remove', params, ctx))
 							// @ts-ignore
 							.then(() => this.adapter.removeById(id))
 							.then((doc) => {
@@ -2949,14 +2871,10 @@ export const TAdapterServiceSchemaMixin = (mixinOptions?: any) => {
 										),
 									);
 								// @ts-ignore
-								return this.adapter
-									.transformDocuments(ctx, {}, doc)
-									.then((json: any) =>
-										// @ts-ignore
-										this.adapter
-											.entityChanged('removed', json, ctx)
-											.then(() => json),
-									);
+								return this.transformDocuments(ctx, {}, doc).then((json: any) =>
+									// @ts-ignore
+									this.entityChanged('removed', json, ctx).then(() => json),
+								);
 							})
 					);
 				},
