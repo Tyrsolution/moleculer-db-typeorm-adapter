@@ -520,6 +520,16 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 									  ),
 									  await this['_insertMany'](entities, options)),
 							)
+							.then(async (entities) => {
+								return await this.findById(
+									ctx,
+									null,
+									Object.entries(entities.insertedIds).map(
+										(key) => key[1],
+									) as any,
+								);
+							})
+							.then((entities) => this.transformDocuments(ctx, ctx.params, entities))
 					);
 				} else if (!isArray(entityOrEntities) && isObject(entityOrEntities)) {
 					return (
@@ -540,6 +550,9 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 									  ),
 									  await this['_insertOne'](entity, options)),
 							)
+							.then(async (entities) => {
+								return await this.findById(ctx, null, entities.insertedId);
+							})
 					);
 				}
 				return reject(
@@ -549,7 +562,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 					),
 				);
 			})
-			.then((docs) => this.transformDocuments(ctx, {}, docs))
+			.then((docs) => this.transformDocuments(ctx, ctx.params, docs))
 			.then((json) => this.entityChanged('created', json, ctx).then(() => json));
 	}
 
@@ -563,7 +576,6 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 * @memberof TypeORMDbAdapter
 	 */
 	async updateById(ctx: Context, id: any, update: any): Promise<any> {
-		const transformId: any = this.beforeQueryTransformID(id);
 		const params = this.sanitizeParams(ctx, update);
 		this.broker.logger.debug(`Updating entity by ID '${id}' with ${JSON.stringify(params)}`);
 		const updatedColumn: any =
@@ -572,9 +584,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 			params[updatedColumn!.propertyName] = new Date();
 		}
 		const entity = await this['_update'](
-			{
-				[transformId]: this.opts.type !== 'mongodb' ? id : this.toMongoObjectId(id),
-			},
+			this.opts.type !== 'mongodb' ? id : this.toMongoObjectId(id),
 			params,
 		)
 			.then(async (docs: any) => {
@@ -2149,9 +2159,9 @@ export const TAdapterServiceSchemaMixin = (mixinOptions?: any) => {
 					},
 					handler(ctx: Context<{ params: ListParams }>): any {
 						// @ts-ignore
-						let sanatizedParams = this.adapter.sanitizeParams(ctx, ctx.params);
+						let sanatizedParams = this.sanitizeParams(ctx, ctx.params);
 						// @ts-ignore
-						return this.adapter.list(ctx, sanatizedParams);
+						return this._list(ctx, sanatizedParams);
 					},
 				},
 
@@ -2173,7 +2183,7 @@ export const TAdapterServiceSchemaMixin = (mixinOptions?: any) => {
 					},
 					handler(ctx: Context): any {
 						// @ts-ignore
-						let params = this.adapter.sanitizeParams(ctx, ctx.params);
+						let params = this.sanitizeParams(ctx, ctx.params);
 						// @ts-ignore
 						// return this.adapter.create(ctx, entityOrEntities, options);
 						return this._create(ctx, params);
@@ -2191,16 +2201,16 @@ export const TAdapterServiceSchemaMixin = (mixinOptions?: any) => {
 				 * @returns {Object|Array<Object>} Saved entity(ies).
 				 */
 				insert: {
+					rest: 'PUT /',
 					params: {
 						entityOrEntities: [{ type: 'object' }, { type: 'array' }],
 						options: { type: 'object', optional: true },
 					},
 					handler(ctx: Context): any {
 						// @ts-ignore
-						let params = this.adapter.sanitizeParams(ctx, ctx.params);
-						const { entityOrEntities, options } = params;
+						let params = this.sanitizeParams(ctx, ctx.params);
 						// @ts-ignore
-						return this.adapter.insert(ctx, entityOrEntities, options);
+						return this._insert(ctx, params);
 					},
 				},
 
@@ -2231,6 +2241,10 @@ export const TAdapterServiceSchemaMixin = (mixinOptions?: any) => {
 							{ type: 'string', optional: true },
 							{ type: 'array', optional: true, items: 'string' },
 						],
+						relations: [
+							{ type: 'string', optional: true },
+							{ type: 'array', optional: true, items: 'string' },
+						],
 						fields: [
 							{ type: 'string', optional: true },
 							{ type: 'array', optional: true, items: 'string' },
@@ -2243,9 +2257,9 @@ export const TAdapterServiceSchemaMixin = (mixinOptions?: any) => {
 					},
 					handler(ctx: Context): any {
 						// @ts-ignore
-						let params = this.adapter.sanitizeParams(ctx, ctx.params);
+						let params = this.sanitizeParams(ctx, ctx.params);
 						// @ts-ignore
-						return this.adapter.findByIdWO(ctx, null, params);
+						return this._get(ctx, null, params);
 					},
 				},
 
@@ -2562,7 +2576,7 @@ export const TAdapterServiceSchemaMixin = (mixinOptions?: any) => {
 				 */
 				_list(ctx: Context, params: ListParams): any {
 					// @ts-ignore
-					this.adapter.list(ctx, params);
+					return this.adapter.list(ctx, params);
 				},
 
 				/**
@@ -2621,90 +2635,37 @@ export const TAdapterServiceSchemaMixin = (mixinOptions?: any) => {
 				 * @returns {Object|Array.<Object>} Saved entity(ies).
 				 */
 				_insert(ctx: Context, params: any): object | Array<object> {
+					const { entityOrEntities, options } = params;
 					return (
-						Promise.resolve()
-							.then(() => {
-								if (Array.isArray(params.entities)) {
-									return (
-										Promise.all(
-											params.entities.map((entity: any) =>
-												// @ts-ignore
-												this.adapter.beforeEntityChange(
-													'create',
-													entity,
-													ctx,
-												),
-											),
-										)
-											// @ts-ignore
-											.then((entities) =>
-												// @ts-ignore
-												this.adapter.validateEntity(entities),
-											)
-											.then((entities) =>
-												Promise.all(
-													entities.map((entity: any) =>
-														// @ts-ignore
-														this.adapter.beforeEntityChange(
-															'create',
-															entity,
-															ctx,
-														),
-													),
-												),
-											)
-											// Apply idField
-											.then((entities) => {
-												// @ts-ignore
-												if (this.settings.idField === '_id')
-													return entities;
-												return entities.map((entity) =>
-													// @ts-ignore
-													this.adapter.beforeSaveTransformID(
-														entity,
-														// @ts-ignore
-														this.settings.idField,
-													),
-												);
-											})
-											// @ts-ignore
-											.then((entities) => this.adapter.insertMany(entities))
-									);
-								} else if (params.entity) {
-									return (
-										// @ts-ignore
-										this.adapter
-											.beforeEntityChange('create', params.entity, ctx)
-											// @ts-ignore
-											.then((entity: any) =>
-												// @ts-ignore
-												this.adapter.validateEntity(entity),
-											)
-											// Apply idField
-											.then((entity: any) =>
-												// @ts-ignore
-												this.adapter.beforeSaveTransformID(
-													entity,
-													// @ts-ignore
-													this.settings.idField,
-												),
-											)
-											// @ts-ignore
-											.then((entity: any) => this.adapter.insert(entity))
-									);
-								}
-								return Promise.reject(
-									new Errors.MoleculerClientError(
-										"Invalid request! The 'params' must contain 'entity' or 'entities'!",
-										400,
-									),
+						this.beforeEntityChange('create', entityOrEntities, ctx)
+							// @ts-ignore
+							.then((entity: any) => {
+								// @ts-ignore
+								this.logger.debug(`Validating entity(s) to insert: ${entity}`);
+								// @ts-ignore
+								return this.validateEntity(entity);
+							})
+							// Apply idField
+							.then((entity: any) => {
+								// @ts-ignore
+								this.logger.debug('Transforming entity id...');
+								// @ts-ignore
+								return this.adapter.beforeSaveTransformID(
+									entity,
+									// @ts-ignore
+									this.settings.idField,
 								);
 							})
-							// @ts-ignore
-							.then((docs) => this.adapter.transformDocuments(ctx, {}, docs))
-							.then((json) =>
+							.then(async (entity: any) => {
 								// @ts-ignore
-								this.adapter.entityChanged('created', json, ctx).then(() => json),
+								this.logger.debug(`Attempting to insert entity: ${entity}`);
+								// @ts-ignore
+								return await this.adapter.insert(ctx, entity, options);
+							})
+							.then((docs: any) => this.transformDocuments(ctx, {}, docs))
+							.then((json: any) =>
+								// @ts-ignore
+								this.entityChanged('created', json, ctx).then(() => json),
 							)
 					);
 				},
