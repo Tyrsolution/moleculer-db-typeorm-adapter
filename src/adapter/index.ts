@@ -334,6 +334,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 				: index !== 0
 				? (this[entityName] = {
 						...methodsToAdd,
+						create: this.create,
 						findByIdWO: this.findByIdWO,
 						findById: this.findById,
 						getPopulations: this.getPopulations,
@@ -424,25 +425,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	// -------------------------------------------------------------------------
 
 	/**
-	 * Count number of matching documents in the db to a query.
-	 *
-	 * @methods
-	 * @param {Object} options - count options
-	 * @param {Object?} query - query options
-	 * @returns {Promise<number>}
-	 * @memberof TypeORMDbAdapter
-	 */
-	async count<T extends Entity>(
-		options?: FindManyOptions<T> | CountOptions,
-		query?: ObjectLiteral,
-	): Promise<number> {
-		return this.opts.type !== 'mongodb'
-			? await this['_count'](options)
-			: await this['_count'](query, options);
-	}
-
-	/**
-	 * Create a new record or records.
+	 * Create new record or records.
 	 *
 	 * @methods
 	 * @param {Object | Array<Object>} entityOrEntities - record(s) to create
@@ -579,6 +562,75 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 			})
 			.then((docs) => this.transformDocuments(ctx, {}, docs))
 			.then((json) => this.entityChanged('created', json, ctx).then(() => json));
+	}
+
+	/**
+	 * Update an entity by ID
+	 * @methods
+	 * @param {Context} ctx - request context
+	 * @param {any} id - ID of record to be updated
+	 * @param {Object} update - Object with update data
+	 * @returns {Promise} - Updated record
+	 * @memberof TypeORMDbAdapter
+	 */
+	async updateById(ctx: Context, id: any, update: any): Promise<any> {
+		const transformId: any = this.beforeQueryTransformID(id);
+		const params = this.sanitizeParams(ctx, ctx.params);
+		const entity = this.beforeEntityChange('update', update, ctx)
+			.then((entity) =>
+				this.service.settings.useDotNotation ? flatten(entity, { safe: true }) : entity,
+			)
+			.then(async (entity) => {
+				this.broker.logger.debug(
+					`Updating entity by ID '${id}' with ${JSON.stringify(entity)}`,
+				);
+				const updatedColumn: any =
+					this.repository!.metadata.ownColumns[0].entityMetadata.updateDateColumn;
+				if (!isUndefined(updatedColumn) && this.opts.type === 'mongodb') {
+					entity[updatedColumn!.propertyName] = new Date();
+				}
+				return await this['_update'](
+					{
+						[transformId]: this.opts.type !== 'mongodb' ? id : this.toMongoObjectId(id),
+					},
+					entity,
+				);
+			})
+			.then(async (docs: any) => {
+				this.broker.logger.debug(`Updated entity by ID '${id}': ${docs}`);
+				const entity = await this.findById(ctx, null, id);
+				this.broker.logger.debug('Transforming update docs...');
+				return this.transformDocuments(ctx, params, entity);
+			})
+			.then((json) => this.entityChanged('updated', json, ctx).then(() => json))
+			.catch((error: any) => {
+				this.broker.logger.error(`Failed to updateById ${error}`);
+				new Errors.MoleculerServerError(
+					`Failed to updateById ${error}`,
+					500,
+					'FAILED_TO_UPDATE_BY_ID',
+					error,
+				);
+			});
+		return this.afterRetrieveTransformID(entity, this.service.settings.idField);
+	}
+
+	/**
+	 * Count number of matching documents in the db to a query.
+	 *
+	 * @methods
+	 * @param {Object} options - count options
+	 * @param {Object?} query - query options
+	 * @returns {Promise<number>}
+	 * @memberof TypeORMDbAdapter
+	 */
+	async count<T extends Entity>(
+		options?: FindManyOptions<T> | CountOptions,
+		query?: ObjectLiteral,
+	): Promise<number> {
+		return this.opts.type !== 'mongodb'
+			? await this['_count'](options)
+			: await this['_count'](query, options);
 	}
 
 	/**
@@ -1040,117 +1092,6 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 		return this.afterRetrieveTransformID(entity, this.service.settings.idField) as
 			| T
 			| undefined;
-	}
-
-	/**
-	 * Update an entity by ID
-	 * @methods
-	 * @param {Context} ctx - request context
-	 * @param {any} id - ID of record to be updated
-	 * @param {Object} update - Object with update data
-	 * @returns {Promise} - Updated record
-	 * @memberof TypeORMDbAdapter
-	 */
-	async updateById(ctx: Context, id: any, update: any): Promise<any> {
-		const transformId: any = this.beforeQueryTransformID(id);
-		const params = this.sanitizeParams(ctx, ctx.params);
-		const entity = this.beforeEntityChange('update', update, ctx)
-			.then(
-				async (entity) =>
-					await this['_update'](
-						{
-							[transformId]:
-								this.opts.type !== 'mongodb' ? id : this.toMongoObjectId(id),
-						},
-						entity,
-					),
-			)
-			.then((docs: any) => {
-				this.broker.logger.debug('Transforming updateById docs...');
-				return this.transformDocuments(ctx, params, docs);
-			})
-			.then((json) => this.entityChanged('updated', json, ctx).then(() => json))
-			.catch((error: any) => {
-				this.broker.logger.error(`Failed to updateById ${error}`);
-				new Errors.MoleculerServerError(
-					`Failed to updateById ${error}`,
-					500,
-					'FAILED_TO_UPDATE_BY_ID',
-					error,
-				);
-			});
-		/* : await this['_update']({ [transformId]: this.toMongoObjectId(id) }, update)
-						.then((docs: any) => {
-							this.broker.logger.debug('Transforming updateById docs...');
-							return this.transformDocuments(ctx, params, docs);
-						})
-						.catch((error: any) => {
-							this.broker.logger.error(`Failed to updateById ${error}`);
-							new Errors.MoleculerServerError(
-								`Failed to updateById ${error}`,
-								500,
-								'FAILED_TO_UPDATE_BY_ID',
-								error,
-							);
-						}); */
-		return this.afterRetrieveTransformID(entity, this.service.settings.idField);
-	}
-
-	/**
-	 * Update an entity by ID
-	 * @methods
-	 * @param {Context} ctx - request context
-	 * @param {Object} update - Object with update data
-	 * @returns {Promise} - Updated record
-	 * @memberof TypeORMDbAdapter
-	 */
-	async update(ctx: Context, update: any): Promise<any> {
-		let id: any;
-		const params = this.sanitizeParams(ctx, update);
-		return await this.beforeEntityChange('update', update, ctx)
-			.then((update) => {
-				let sets: { [key: string]: any } = {};
-				// Convert fields from params to "$set" update object
-				Object.keys(update).forEach((prop) => {
-					if (prop == 'id' || prop == this.service.settings.idField) {
-						id = this.decodeID(update[prop]);
-					} else {
-						sets[prop] = update[prop];
-					}
-				});
-				if (this.service.settings.useDotNotation) sets = flatten(sets, { safe: true });
-				return sets;
-			})
-			.then(async (entity) => {
-				this.broker.logger.debug(
-					`Updating entity by ID '${id}' with ${JSON.stringify(entity)}`,
-				);
-				const updatedColumn: any =
-					this.repository!.metadata.ownColumns[0].entityMetadata.updateDateColumn;
-				if (!isUndefined(updatedColumn) && this.opts.type === 'mongodb') {
-					entity[updatedColumn!.propertyName] = new Date();
-				}
-				return await this['_update'](
-					this.opts.type !== 'mongodb' ? id : this.toMongoObjectId(id),
-					entity,
-				);
-			})
-			.then(async (docs: any) => {
-				this.broker.logger.debug(`Updated entity by ID '${id}': ${docs}`);
-				const entity = await this.findById(ctx, null, id);
-				this.broker.logger.debug('Transforming update docs...');
-				return this.transformDocuments(ctx, params, entity);
-			})
-			.then((json) => this.entityChanged('updated', json, ctx).then(() => json))
-			.catch((error: any) => {
-				this.broker.logger.error(`Failed to update: ${error}`);
-				new Errors.MoleculerServerError(
-					`Failed to update ${error}`,
-					500,
-					'FAILED_TO_UPDATE',
-					error,
-				);
-			});
 	}
 
 	/**
@@ -2345,8 +2286,75 @@ export const TAdapterServiceSchemaMixin = (mixinOptions?: any) => {
 						id: { type: 'any' },
 					},
 					handler(ctx: Context): any {
+						let id: any;
 						// @ts-ignore
-						return this.adapter.update(ctx, ctx.params);
+						const params = this.sanitizeParams(ctx, ctx.params);
+						// @ts-ignore
+						return this.adapter
+							.beforeEntityChange('update', params, ctx)
+							.then((update: any) => {
+								let sets: { [key: string]: any } = {};
+								// Convert fields from params to "$set" update object
+								Object.keys(update).forEach((prop) => {
+									// @ts-ignore
+									if (prop == 'id' || prop == this.settings.idField) {
+										// @ts-ignore
+										id = this.decodeID(update[prop]);
+									} else {
+										sets[prop] = update[prop];
+									}
+								});
+								// @ts-ignore
+								if (this.settings.useDotNotation)
+									sets = flatten(sets, { safe: true });
+								return sets;
+							})
+							.then(async (entity: any) => {
+								// @ts-ignore
+								this.logger.debug(
+									`Updating entity by ID '${id}' with ${JSON.stringify(entity)}`,
+								);
+								const updatedColumn: any =
+									// @ts-ignore
+									this.adapter.repository!.metadata.ownColumns[0].entityMetadata
+										.updateDateColumn;
+								// @ts-ignore
+								if (
+									!isUndefined(updatedColumn) &&
+									// @ts-ignore
+									this.adapter.opts.type === 'mongodb'
+								) {
+									entity[updatedColumn!.propertyName] = new Date();
+								}
+								// @ts-ignore
+								return await this.adapter.updateById(ctx, id, entity);
+							})
+							.then(async (docs: any) => {
+								// @ts-ignore
+								this.logger.debug(`Updated entity by ID '${id}': ${docs}`);
+								// @ts-ignore
+								const entity = await this.adapter.findById(ctx, null, id);
+								// @ts-ignore
+								this.logger.debug('Transforming update docs...');
+								// @ts-ignore
+								return this.transformDocuments(ctx, params, entity);
+							})
+							.then((json: any) =>
+								// @ts-ignore
+								this.adapter.entityChanged('updated', json, ctx).then(() => json),
+							)
+							.catch((error: any) => {
+								// @ts-ignore
+								this.logger.error(`Failed to update: ${error}`);
+								new Errors.MoleculerServerError(
+									`Failed to update ${error}`,
+									500,
+									'FAILED_TO_UPDATE',
+									error,
+								);
+							});
+						// @ts-ignore
+						// return this.adapter.update(ctx, ctx.params);
 					},
 				},
 
@@ -2416,9 +2424,9 @@ export const TAdapterServiceSchemaMixin = (mixinOptions?: any) => {
 				 * @returns {Object} - Sanitized parameters
 				 * @memberof TypeORMDbAdapter
 				 */
-				sanitizeParams(ctx: any, params: any) {
+				sanitizeParams(ctx: any, params: any): any {
 					// @ts-ignore
-					this.adapter.sanitizeParams(ctx, ctx.params);
+					return this.adapter.sanitizeParams(ctx, params);
 				},
 
 				/**
