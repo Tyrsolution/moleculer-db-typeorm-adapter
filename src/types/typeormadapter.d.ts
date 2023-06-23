@@ -3,7 +3,7 @@
  * Copyright (c) 2023 TyrSolutions (https://github.com/Tyrsolution/moleculer-db-typeorm-adapter)
  * MIT Licensed
  */
-import { Service, ServiceBroker } from 'moleculer';
+import { Context, Service, ServiceBroker, ServiceSchema } from 'moleculer';
 import {
 	AggregateOptions,
 	AggregationCursor,
@@ -14,6 +14,7 @@ import {
 	CollStatsOptions,
 	Collection,
 	CommandOperationOptions,
+	CountOptions,
 	CreateIndexesOptions,
 	DataSource,
 	DataSourceOptions,
@@ -23,6 +24,7 @@ import {
 	EntityManager,
 	EntityTarget,
 	Filter,
+	FilterOperators,
 	FindCursor,
 	FindManyOptions,
 	FindOneAndDeleteOptions,
@@ -38,7 +40,6 @@ import {
 	InsertOneOptions,
 	InsertOneResult,
 	InsertResult,
-	JoinOptions,
 	ListIndexesCursor,
 	ListIndexesOptions,
 	ObjectId,
@@ -56,6 +57,7 @@ import {
 	UpdateResult,
 } from 'typeorm';
 import { PickKeysByType } from 'typeorm/common/PickKeysByType';
+import { MongoFindOneOptions } from 'typeorm/find-options/mongodb/MongoFindOneOptions';
 import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 import { UpsertOptions } from 'typeorm/repository/UpsertOptions';
 
@@ -261,7 +263,7 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	 * Saves all given entities in the database.
 	 * If entities do not exist in the database then inserts, otherwise updates.
 	 */
-	save<T extends DeepPartial<Entity>>(
+	_save<T extends DeepPartial<Entity>>(
 		entities: T[],
 		options: SaveOptions & {
 			reload: false;
@@ -271,7 +273,7 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	 * Saves all given entities in the database.
 	 * If entities do not exist in the database then inserts, otherwise updates.
 	 */
-	save<T extends DeepPartial<Entity>>(
+	_save<T extends DeepPartial<Entity>>(
 		entities: T[],
 		options?: SaveOptions,
 	): Promise<(T & Entity)[]>;
@@ -279,7 +281,7 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	 * Saves a given entity in the database.
 	 * If entity does not exist in the database then inserts, otherwise updates.
 	 */
-	save<T extends DeepPartial<Entity>>(
+	_save<T extends DeepPartial<Entity>>(
 		entity: T,
 		options: SaveOptions & {
 			reload: false;
@@ -289,19 +291,19 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	 * Saves a given entity in the database.
 	 * If entity does not exist in the database then inserts, otherwise updates.
 	 */
-	save<T extends DeepPartial<Entity>>(entity: T, options?: SaveOptions): Promise<T & Entity>;
+	_save<T extends DeepPartial<Entity>>(entity: T, options?: SaveOptions): Promise<T & Entity>;
 	/**
 	 * Removes a given entities from the database.
 	 */
-	remove<T extends Entity>(entities: T[], options?: RemoveOptions): Promise<T[]>;
+	_remove<T extends Entity>(entities: T[], options?: RemoveOptions): Promise<T[]>;
 	/**
 	 * Removes a given entity from the database.
 	 */
-	remove<T extends Entity>(entity: T, options?: RemoveOptions): Promise<T>;
+	_remove<T extends Entity>(entity: T, options?: RemoveOptions): Promise<T>;
 	/**
 	 * Records the delete date of all given entities.
 	 */
-	softRemove<T extends DeepPartial<Entity>>(
+	_softRemove<T extends DeepPartial<Entity>>(
 		entities: T[],
 		options: SaveOptions & {
 			reload: false;
@@ -310,14 +312,14 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	/**
 	 * Records the delete date of all given entities.
 	 */
-	softRemove<T extends DeepPartial<Entity>>(
+	_softRemove<T extends DeepPartial<Entity>>(
 		entities: T[],
 		options?: SaveOptions,
 	): Promise<(T & Entity)[]>;
 	/**
 	 * Records the delete date of a given entity.
 	 */
-	softRemove<T extends DeepPartial<Entity>>(
+	_softRemove<T extends DeepPartial<Entity>>(
 		entity: T,
 		options: SaveOptions & {
 			reload: false;
@@ -326,14 +328,14 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	/**
 	 * Records the delete date of a given entity.
 	 */
-	softRemove<T extends DeepPartial<Entity>>(
+	_softRemove<T extends DeepPartial<Entity>>(
 		entity: T,
 		options?: SaveOptions,
 	): Promise<T & Entity>;
 	/**
 	 * Recovers all given entities in the database.
 	 */
-	recover<T extends DeepPartial<Entity>>(
+	_recover<T extends DeepPartial<Entity>>(
 		entities: T[],
 		options: SaveOptions & {
 			reload: false;
@@ -342,14 +344,14 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	/**
 	 * Recovers all given entities in the database.
 	 */
-	recover<T extends DeepPartial<Entity>>(
+	_recover<T extends DeepPartial<Entity>>(
 		entities: T[],
 		options?: SaveOptions,
 	): Promise<(T & Entity)[]>;
 	/**
 	 * Recovers a given entity in the database.
 	 */
-	recover<T extends DeepPartial<Entity>>(
+	_recover<T extends DeepPartial<Entity>>(
 		entity: T,
 		options: SaveOptions & {
 			reload: false;
@@ -358,11 +360,11 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	/**
 	 * Recovers a given entity in the database.
 	 */
-	recover<T extends DeepPartial<Entity>>(entity: T, options?: SaveOptions): Promise<T & Entity>;
+	_recover<T extends DeepPartial<Entity>>(entity: T, options?: SaveOptions): Promise<T & Entity>;
 	/**
 	 * Reloads entity data from the database.
 	 */
-	reload(): Promise<void>;
+	_reload(): Promise<void>;
 	/**
 	 * Sets DataSource to be used by entity.
 	 */
@@ -384,28 +386,28 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	/**
 	 * Creates a new query builder that can be used to build a SQL query.
 	 */
-	createQueryBuilder<T extends Entity>(
+	_createQueryBuilder<T extends Entity>(
 		alias?: string,
 		queryRunner?: QueryRunner,
 	): SelectQueryBuilder<T>;
 	/**
 	 * Creates a new entity instance.
 	 */
-	create<T extends Entity>(this: { new (): T }): T;
+	_create<T extends Entity>(this: { new (): T }): T;
 	/**
 	 * Creates new entities and copies all entity properties from given objects into their new entities.
 	 * Note that it copies only properties that are present in entity schema.
 	 */
-	create<T extends Entity>(entityLikeArray: DeepPartial<T>[]): T[];
+	_create<T extends Entity>(entityLikeArray: DeepPartial<T>[]): T[];
 	/**
 	 * Creates a new entity instance and copies all entity properties from this object into a new entity.
 	 * Note that it copies only properties that are present in entity schema.
 	 */
-	create<T extends Entity>(entityLike: DeepPartial<T>): T;
+	_create<T extends Entity>(entityLike: DeepPartial<T>): T;
 	/**
 	 * Merges multiple entities (or entity-like objects) into a given entity.
 	 */
-	merge<T extends Entity>(mergeIntoEntity: T, ...entityLikes: DeepPartial<T>[]): T;
+	_merge<T extends Entity>(mergeIntoEntity: T, ...entityLikes: DeepPartial<T>[]): T;
 	/**
 	 * Creates a new entity from the given plain javascript object. If entity already exist in the database, then
 	 * it loads it (and everything related to it), replaces all values with the new ones from the given object
@@ -415,14 +417,14 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	 * Note that given entity-like object must have an entity id / primary key to find entity by.
 	 * Returns undefined if entity with given id was not found.
 	 */
-	preload<T extends Entity>(entityLike: DeepPartial<T>): Promise<T | undefined>;
+	_preload<T extends Entity>(entityLike: DeepPartial<T>): Promise<T | undefined>;
 	/**
 	 * Inserts a given entity into the database.
 	 * Unlike save method executes a primitive operation without cascades, relations and other operations included.
 	 * Executes fast and efficient INSERT query.
 	 * Does not check if entity exist in the database, so query will fail if duplicate entity is being inserted.
 	 */
-	insert<T extends Entity>(
+	_insert<T extends Entity>(
 		entity: QueryDeepPartialEntity<T> | QueryDeepPartialEntity<T>[],
 	): Promise<InsertResult>;
 	/**
@@ -431,7 +433,7 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	 * Executes fast and efficient UPDATE query.
 	 * Does not check if entity exist in the database.
 	 */
-	update<T extends Entity>(
+	_update<T extends Entity>(
 		criteria:
 			| string
 			| string[]
@@ -449,7 +451,7 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	 * Unlike save method executes a primitive operation without cascades, relations and other operations included.
 	 * Executes fast and efficient INSERT ... ON CONFLICT DO UPDATE/ON DUPLICATE KEY UPDATE query.
 	 */
-	upsert<T extends Entity>(
+	_upsert<T extends Entity>(
 		entityOrEntities: QueryDeepPartialEntity<T> | QueryDeepPartialEntity<T>[],
 		conflictPathsOrOptions: string[] | UpsertOptions<T>,
 	): Promise<InsertResult>;
@@ -459,7 +461,7 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	 * Executes fast and efficient DELETE query.
 	 * Does not check if entity exist in the database.
 	 */
-	delete<T extends Entity>(
+	_delete<T extends Entity>(
 		criteria:
 			| string
 			| string[]
@@ -475,98 +477,98 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	 * Counts entities that match given options.
 	 * Useful for pagination.
 	 */
-	count<T extends Entity>(options?: FindManyOptions<T>): Promise<number>;
+	_count<T extends Entity>(options?: FindManyOptions<T>): Promise<number>;
 	/**
 	 * Counts entities that match given conditions.
 	 * Useful for pagination.
 	 */
-	countBy<T extends Entity>(where: FindOptionsWhere<T> | FindOptionsWhere<T>[]): Promise<number>;
+	_countBy<T extends Entity>(where: FindOptionsWhere<T> | FindOptionsWhere<T>[]): Promise<number>;
 	/**
 	 * Return the SUM of a column
 	 */
-	sum<T extends Entity>(
+	_sum<T extends Entity>(
 		columnName: PickKeysByType<T, number>,
 		where?: FindOptionsWhere<T> | FindOptionsWhere<T>[],
 	): Promise<number | null>;
 	/**
 	 * Return the AVG of a column
 	 */
-	average<T extends Entity>(
+	_average<T extends Entity>(
 		columnName: PickKeysByType<T, number>,
 		where?: FindOptionsWhere<T> | FindOptionsWhere<T>[],
 	): Promise<number | null>;
 	/**
 	 * Return the MIN of a column
 	 */
-	minimum<T extends Entity>(
+	_minimum<T extends Entity>(
 		columnName: PickKeysByType<T, number>,
 		where?: FindOptionsWhere<T> | FindOptionsWhere<T>[],
 	): Promise<number | null>;
 	/**
 	 * Return the MAX of a column
 	 */
-	maximum<T extends Entity>(
+	_maximum<T extends Entity>(
 		columnName: PickKeysByType<T, number>,
 		where?: FindOptionsWhere<T> | FindOptionsWhere<T>[],
 	): Promise<number | null>;
 	/**
 	 * Finds entities that match given find options.
 	 */
-	find<T extends Entity>(options?: FindManyOptions<T>): Promise<T[]>;
+	_find<T extends Entity>(options?: FindManyOptions<T>): Promise<T[]>;
 	/**
 	 * Finds entities that match given find options.
 	 */
-	findBy<T extends Entity>(where: FindOptionsWhere<T> | FindOptionsWhere<T>[]): Promise<T[]>;
+	_findBy<T extends Entity>(where: FindOptionsWhere<T> | FindOptionsWhere<T>[]): Promise<T[]>;
 	/**
 	 * Finds entities that match given find options.
 	 * Also counts all entities that match given conditions,
 	 * but ignores pagination settings (from and take options).
 	 */
-	findAndCount<T extends Entity>(options?: FindManyOptions<T>): Promise<[T[], number]>;
+	_findAndCount<T extends Entity>(options?: FindManyOptions<T>): Promise<[T[], number]>;
 	/**
 	 * Finds entities that match given WHERE conditions.
 	 * Also counts all entities that match given conditions,
 	 * but ignores pagination settings (from and take options).
 	 */
-	findAndCountBy<T extends Entity>(
+	_findAndCountBy<T extends Entity>(
 		where: FindOptionsWhere<T> | FindOptionsWhere<T>[],
 	): Promise<[T[], number]>;
 	/**
 	 * Finds first entity by a given find options.
 	 * If entity was not found in the database - returns null.
 	 */
-	findOne<T extends Entity>(options: FindOneOptions<T>): Promise<T | null>;
+	_findOne<T extends Entity>(options: FindOneOptions<T>): Promise<T | null>;
 	/**
 	 * Finds first entity that matches given where condition.
 	 * If entity was not found in the database - returns null.
 	 */
-	findOneBy<T extends Entity>(
+	_findOneBy<T extends Entity>(
 		where: FindOptionsWhere<T> | FindOptionsWhere<T>[],
 	): Promise<T | null>;
 	/**
 	 * Finds first entity by a given find options.
 	 * If entity was not found in the database - rejects with error.
 	 */
-	findOneOrFail<T extends Entity>(options: FindOneOptions<T>): Promise<T>;
+	_findOneOrFail<T extends Entity>(options: FindOneOptions<T>): Promise<T>;
 	/**
 	 * Finds first entity that matches given where condition.
 	 * If entity was not found in the database - rejects with error.
 	 */
-	findOneByOrFail<T extends Entity>(
+	_findOneByOrFail<T extends Entity>(
 		where: FindOptionsWhere<T> | FindOptionsWhere<T>[],
 	): Promise<T>;
 	/**
 	 * Executes a raw SQL query and returns a raw database results.
 	 * Raw query execution is supported only by relational databases (MongoDB is not supported).
 	 */
-	query<T extends Entity>(query: string, parameters?: any[]): Promise<any>;
+	_query<T extends Entity>(query: string, parameters?: any[]): Promise<any>;
 	/**
 	 * Clears all the data from the given table/collection (truncates/drops it).
 	 *
 	 * Note: this method uses TRUNCATE and may not work as you expect in transactions on some platforms.
 	 * @see https://stackoverflow.com/a/5972738/925151
 	 */
-	clear<T extends Entity>(this: { new (): T }): Promise<void>;
+	_clear<T extends Entity>(this: { new (): T }): Promise<void>;
 	/**
 	 * MongoDB Only methods
 	 */
@@ -574,18 +576,18 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	 * MongoDB Only
 	 * Creates a cursor for a query that can be used to iterate over results from MongoDB.
 	 */
-	createCursor<T = any>(query?: Filter<Entity>): FindCursor<T>;
+	_createCursor<T = any>(query?: Filter<Entity>): FindCursor<T>;
 	/**
 	 * MongoDB Only
 	 * Creates a cursor for a query that can be used to iterate over results from MongoDB.
 	 * This returns modified version of cursor that transforms each result into Entity model.
 	 */
-	createEntityCursor(query?: Filter<Entity>): FindCursor<Entity>;
+	_createEntityCursor(query?: Filter<Entity>): FindCursor<Entity>;
 	/**
 	 * MongoDB Only
 	 * Execute an aggregation framework pipeline against the collection.
 	 */
-	aggregate<R = any>(
+	_aggregate<R = any>(
 		pipeline: ObjectLiteral[],
 		options?: AggregateOptions,
 	): AggregationCursor<Entity>;
@@ -594,7 +596,7 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	 * Execute an aggregation framework pipeline against the collection.
 	 * This returns modified version of cursor that transforms each result into Entity model.
 	 */
-	aggregateEntity(
+	_aggregateEntity(
 		pipeline: ObjectLiteral[],
 		options?: AggregateOptions,
 	): AggregationCursor<Entity>;
@@ -602,7 +604,7 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	 * MongoDB Only
 	 * Perform a bulkWrite operation without a fluent API.
 	 */
-	bulkWrite(
+	_bulkWrite(
 		operations: AnyBulkWriteOperation[],
 		options?: BulkWriteOptions,
 	): Promise<BulkWriteResult>;
@@ -610,7 +612,7 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	 * MongoDB Only
 	 * Creates an index on the db and collection.
 	 */
-	createCollectionIndex(
+	_createCollectionIndex(
 		fieldOrSpec: string | any,
 		options?: CreateIndexesOptions,
 	): Promise<string>;
@@ -620,42 +622,42 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	 * Earlier version of MongoDB will throw a command not supported error.
 	 * Index specifications are defined at http://docs.mongodb.org/manual/reference/command/createIndexes/.
 	 */
-	createCollectionIndexes(indexSpecs: IndexDescription[]): Promise<string[]>;
+	_createCollectionIndexes(indexSpecs: IndexDescription[]): Promise<string[]>;
 	/**
 	 * MongoDB Only
 	 * Delete multiple documents on MongoDB.
 	 */
-	deleteMany(query: ObjectLiteral, options?: DeleteOptions): Promise<DeleteResult>;
+	_deleteMany(query: ObjectLiteral, options?: DeleteOptions): Promise<DeleteResult>;
 	/**
 	 * MongoDB Only
 	 * Delete a document on MongoDB.
 	 */
-	deleteOne(query: ObjectLiteral, options?: DeleteOptions): Promise<DeleteResult>;
+	_deleteOne(query: ObjectLiteral, options?: DeleteOptions): Promise<DeleteResult>;
 	/**
 	 * MongoDB Only
 	 * The distinct command returns returns a list of distinct values for the given key across a collection.
 	 */
-	distinct(key: string, query: ObjectLiteral, options?: CommandOperationOptions): Promise<any>;
+	_distinct(key: string, query: ObjectLiteral, options?: CommandOperationOptions): Promise<any>;
 	/**
 	 * MongoDB Only
 	 * Drops an index from this collection.
 	 */
-	dropCollectionIndex(indexName: string, options?: CommandOperationOptions): Promise<any>;
+	_dropCollectionIndex(indexName: string, options?: CommandOperationOptions): Promise<any>;
 	/**
 	 * MongoDB Only
 	 * Drops all indexes from the collection.
 	 */
-	dropCollectionIndexes(): Promise<any>;
+	_dropCollectionIndexes(): Promise<any>;
 	/**
 	 * MongoDB Only
 	 * Find a document and delete it in one atomic operation, requires a write lock for the duration of the operation.
 	 */
-	findOneAndDelete(query: ObjectLiteral, options?: FindOneAndDeleteOptions): Promise<Document>;
+	_findOneAndDelete(query: ObjectLiteral, options?: FindOneAndDeleteOptions): Promise<Document>;
 	/**
 	 * MongoDB Only
 	 * Find a document and replace it in one atomic operation, requires a write lock for the duration of the operation.
 	 */
-	findOneAndReplace(
+	_findOneAndReplace(
 		query: ObjectLiteral,
 		replacement: Object,
 		options?: FindOneAndReplaceOptions,
@@ -664,7 +666,7 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	 * MongoDB Only
 	 * Find a document and update it in one atomic operation, requires a write lock for the duration of the operation.
 	 */
-	findOneAndUpdate(
+	_findOneAndUpdate(
 		query: ObjectLiteral,
 		update: Object,
 		options?: FindOneAndUpdateOptions,
@@ -673,32 +675,32 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	 * MongoDB Only
 	 * Retrieve all the indexes on the collection.
 	 */
-	collectionIndexes(): Promise<any>;
+	_collectionIndexes(): Promise<any>;
 	/**
 	 * MongoDB Only
 	 * Retrieve all the indexes on the collection.
 	 */
-	collectionIndexExists(indexes: string | string[]): Promise<boolean>;
+	_collectionIndexExists(indexes: string | string[]): Promise<boolean>;
 	/**
 	 * MongoDB Only
 	 * Retrieves this collections index info.
 	 */
-	collectionIndexInformation(options?: { full: boolean }): Promise<any>;
+	_collectionIndexInformation(options?: { full: boolean }): Promise<any>;
 	/**
 	 * MongoDB Only
 	 * Initiate an In order bulk write operation, operations will be serially executed in the order they are added, creating a new operation for each switch in types.
 	 */
-	initializeOrderedBulkOp(options?: BulkWriteOptions): OrderedBulkOperation;
+	_initializeOrderedBulkOp(options?: BulkWriteOptions): OrderedBulkOperation;
 	/**
 	 * MongoDB Only
 	 * Initiate a Out of order batch write operation. All operations will be buffered into insert/update/remove commands executed out of order.
 	 */
-	initializeUnorderedBulkOp(options?: BulkWriteOptions): UnorderedBulkOperation;
+	_initializeUnorderedBulkOp(options?: BulkWriteOptions): UnorderedBulkOperation;
 	/**
 	 * MongoDB Only
 	 * Inserts an array of documents into MongoDB.
 	 */
-	insertMany(
+	_insertMany(
 		docs: ObjectLiteral[],
 		options?: BulkWriteOptions,
 	): Promise<InsertManyResult<Document>>;
@@ -706,27 +708,27 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	 * MongoDB Only
 	 * Inserts a single document into MongoDB.
 	 */
-	insertOne(doc: ObjectLiteral, options?: InsertOneOptions): Promise<InsertOneResult>;
+	_insertOne(doc: ObjectLiteral, options?: InsertOneOptions): Promise<InsertOneResult>;
 	/**
 	 * MongoDB Only
 	 * Returns if the collection is a capped collection.
 	 */
-	isCapped(): Promise<any>;
+	_isCapped(): Promise<any>;
 	/**
 	 * MongoDB Only
 	 * Get the list of all indexes information for the collection.
 	 */
-	listCollectionIndexes(options?: ListIndexesOptions): ListIndexesCursor;
+	_listCollectionIndexes(options?: ListIndexesOptions): ListIndexesCursor;
 	/**
 	 * MongoDB Only
 	 * Reindex all indexes on the collection Warning: reIndex is a blocking operation (indexes are rebuilt in the foreground) and will be slow for large collections.
 	 */
-	rename(newName: string, options?: { dropTarget?: boolean }): Promise<Collection<Document>>;
+	_rename(newName: string, options?: { dropTarget?: boolean }): Promise<Collection<Document>>;
 	/**
 	 * MongoDB Only
 	 * Replace a document on MongoDB.
 	 */
-	replaceOne(
+	_replaceOne(
 		query: ObjectLiteral,
 		doc: ObjectLiteral,
 		options?: ReplaceOptions,
@@ -735,12 +737,12 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	 * MongoDB Only
 	 * Get all the collection statistics.
 	 */
-	stats(options?: CollStatsOptions): Promise<CollStats>;
+	_stats(options?: CollStatsOptions): Promise<CollStats>;
 	/**
 	 * MongoDB Only
 	 * Update multiple documents on MongoDB.
 	 */
-	updateMany(
+	_updateMany(
 		query: ObjectLiteral,
 		update: UpdateFilter<Document>,
 		options?: UpdateOptions,
@@ -749,7 +751,7 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	 * MongoDB Only
 	 * Update a single document on MongoDB.
 	 */
-	updateOne(
+	_updateOne(
 		query: ObjectLiteral,
 		update: UpdateFilter<Document>,
 		options?: UpdateOptions,
@@ -764,44 +766,139 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	 */
 	beforeQueryTransformID(idField: any): any;
 	/**
+	 * Count number of matching documents in the db to a query.
+	 *
+	 * @methods
+	 * @param {Object} options - count options
+	 * @param {Object?} query - query options
+	 * @returns {Promise<number>}
+	 * @memberof TypeORMDbAdapter
+	 */
+	count<T extends Entity>(
+		options?: FindManyOptions<T> | CountOptions,
+		query?: ObjectLiteral,
+	): Promise<number>;
+	/**
+	 * Finds entities that match given find options.
+	 *
+	 * @methods
+	 * @param {Context} ctx - request context
+	 * @param {Object} findManyOptions - find many options
+	 * @returns {Promise<[T | number]>}
+	 * @memberof TypeORMDbAdapter
+	 */
+	find<T extends Entity>(
+		ctx: Context,
+		findManyOptions?: FindManyOptions<T> | Partial<T> | FilterOperators<T>,
+	): Promise<[T[], number]>;
+	/**
+	 * Finds first item by a given find options.
+	 * If entity was not found in the database - returns null.
+	 * Available Options props:
+	 * - comment
+	 * - select
+	 * - where
+	 * - relations
+	 * - relationLoadStrategy
+	 * - join
+	 * - order
+	 * - cache
+	 * - lock
+	 * - withDeleted
+	 * - loadRelationIds
+	 * - loadEagerRelations
+	 * - transaction
+	 *
+	 * @methods
+	 * @param {Context} ctx - request context
+	 * @param {Object} findOptions - find options
+	 * @returns {Promise<T | undefined>}
+	 * @memberof TypeORMDbAdapter
+	 */
+	findOne<T extends Entity>(
+		ctx: Context,
+		findOptions?: FindOneOptions<T> | MongoFindOneOptions<T>,
+	): Promise<T | undefined>;
+	/**
 	 * Gets item by id. Can use find options
 	 *
 	 * @methods
-	 * @param {Partial<T>} key - primary column name
+	 * @param {Context} ctx - Request context
+	 * @param {Partial<T>} key - primary db id column name
 	 * @param {string | number} id - id of entity
 	 * @param {Object} findOptions - find options, like relations, order, etc. No where clause
 	 * @returns {Promise<T | undefined>}
 	 *
 	 */
 	findByIdWO<T extends Entity>(
+		ctx: Context,
 		key: string | undefined | null,
-		id: string | number,
-		findOptions?: FindOneOptions<T>,
+		id: string | number | string[] | number[],
+		findOptions?: FindOneOptions<T> | FindManyOptions<T>,
 	): Promise<T | undefined>;
 
 	/**
 	 * Gets item by id. No find options
 	 *
 	 * @methods
-	 * @param {Partial<T>} key - primary column name
+	 * @param {Context} ctx - Request context
+	 * @param {Partial<T>} key - primary db id column name
 	 * @param {string | number} id - id of entity
 	 * @returns {Promise<T | undefined>}
 	 *
 	 */
 	findById<T extends Entity>(
+		ctx: Context,
 		key: string | undefined | null,
-		id: string | number,
+		id: string | number | string[] | number[],
 	): Promise<T | undefined>;
+	/**
+	 * Populates entity(ies) by id(s) of another record.
+	 *
+	 * @methods
+	 *
+	 * @param {Context} ctx - Context instance.
+	 * @param {Object?} params - Parameters.
+	 *
+	 * @returns {Object|Array<Object>} Found entity(ies).
+	 *
+	 * @throws {EntityNotFoundError} - 404 Entity not found
+	 */
+	getPopulations(ctx: Context, params?: any): Object | Array<Object>;
 	/**
 	 * Gets items by id.
 	 *
 	 * @methods
-	 * @param {Partial<T>} key - primary column name
+	 * @param {Context} ctx - Request context
+	 * @param {Partial<T>} key - primary db id column name
 	 * @param {Array<string> | Array<number>} ids - ids of entity
 	 * @returns {Promise<T | undefined>}
 	 *
 	 */
-	findByIds<T extends Entity>(key: string | undefined | null, ids: any[]): Promise<T | undefined>;
+	findByIds<T extends Entity>(
+		ctx: Context,
+		key: string | undefined | null,
+		ids: any[],
+	): Promise<T | undefined>;
+	/**
+	 * Gets multiple items by id.
+	 * Can use find options, no where clause.
+	 * @methods
+	 * @param {Context} ctx - Request context
+	 * @param {Partial<T>} key - primary db id column name
+	 * @param {Array<string> | Array<number>} ids - ids of entity
+	 * @param {Object} findOptions - find options, like relations, order, etc. No where clause
+	 * @returns {Promise<T | undefined>}
+	 * @memberof TypeORMDbAdapter
+	 * @deprecated - use findByIdWO instead. It now supports multiple ids
+	 *
+	 */
+	findByIdsWO<T extends Entity>(
+		ctx: Context,
+		key: string | undefined | null,
+		ids: any[],
+		findOptions?: FindOneOptions<T>,
+	): Promise<T | undefined>;
 	/**
 	 * List entities by filters and pagination results.
 	 *
@@ -840,6 +937,24 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	 * @returns {any}
 	 */
 	decodeID(id: any): any;
+
+	/**
+	 * Convert id to mongodb ObjectId.
+	 * @methods
+	 * @param {any} id
+	 * @returns {any}
+	 * @memberof TypeORMDbAdapter
+	 */
+	toMongoObjectId(id: any): ObjectId;
+
+	/**
+	 * Convert mongodb ObjectId to string.
+	 * @methods
+	 * @param {any} id
+	 * @returns {any}
+	 * @memberof TypeORMDbAdapter
+	 */
+	fromMongoObjectId(id: any): string;
 
 	/**
 	 * Transform the fetched documents
@@ -943,14 +1058,25 @@ export interface DbAdapter<Entity extends ObjectLiteral> {
 	 */
 	authorizeFields(askedFields: any[]): any[];
 	/**
-	 * Update an entity by ID
+	 * Sanitize context parameters at `find` action.
 	 *
+	 * @methods
+	 *
+	 * @param {Context} ctx - Request context
+	 * @param {Object} params - Request parameters
+	 * @returns {Object} - Sanitized parameters
+	 * @memberof TypeORMDbAdapter
+	 */
+	sanitizeParams(ctx: any, params: any): any;
+	/**
+	 * Update an entity by ID
+	 * @param {Context} ctx - Request context
 	 * @param {any} id
 	 * @param {Object} update
 	 * @returns {Promise}
 	 * @memberof MemoryDbAdapter
 	 */
-	updateById(id: any, update: any): Promise<any>;
+	updateById(ctx: Context, id: any, update: any): Promise<any>;
 }
 
 export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements DbAdapter<Entity> {
@@ -1025,20 +1151,6 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	 */
 	disconnect(): Promise<any>;
 	/**
-	 * Gets current entity's Repository and returns it.
-	 * Needed for active record to work from base entity and
-	 * Uses this.entity which could be an entity or an array of entities.
-	 * If this._entity is an array, uses first entity in array for active record.
-	 * Used internally by this.adapter for base conection.
-	 *
-	 * @methods
-	 * @private
-	 * @param {T} this
-	 * @returns {Repository<Entity>}
-	 *
-	 */
-	getRepository<T extends this>(this: T): Repository<Entity>;
-	/**
 	 * Checks if entity has an id.
 	 * If entity composite compose ids, it will check them all.
 	 */
@@ -1047,7 +1159,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	 * Saves all given entities in the database.
 	 * If entities do not exist in the database then inserts, otherwise updates.
 	 */
-	save<T extends DeepPartial<Entity>>(
+	_save<T extends DeepPartial<Entity>>(
 		entities: T[],
 		options: SaveOptions & {
 			reload: false;
@@ -1057,7 +1169,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	 * Saves all given entities in the database.
 	 * If entities do not exist in the database then inserts, otherwise updates.
 	 */
-	save<T extends DeepPartial<Entity>>(
+	_save<T extends DeepPartial<Entity>>(
 		entities: T[],
 		options?: SaveOptions,
 	): Promise<(T & Entity)[]>;
@@ -1065,7 +1177,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	 * Saves a given entity in the database.
 	 * If entity does not exist in the database then inserts, otherwise updates.
 	 */
-	save<T extends DeepPartial<Entity>>(
+	_save<T extends DeepPartial<Entity>>(
 		entity: T,
 		options: SaveOptions & {
 			reload: false;
@@ -1075,19 +1187,19 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	 * Saves a given entity in the database.
 	 * If entity does not exist in the database then inserts, otherwise updates.
 	 */
-	save<T extends DeepPartial<Entity>>(entity: T, options?: SaveOptions): Promise<T & Entity>;
+	_save<T extends DeepPartial<Entity>>(entity: T, options?: SaveOptions): Promise<T & Entity>;
 	/**
 	 * Removes a given entities from the database.
 	 */
-	remove<T extends Entity>(entities: T[], options?: RemoveOptions): Promise<T[]>;
+	_remove<T extends Entity>(entities: T[], options?: RemoveOptions): Promise<T[]>;
 	/**
 	 * Removes a given entity from the database.
 	 */
-	remove<T extends Entity>(entity: T, options?: RemoveOptions): Promise<T>;
+	_remove<T extends Entity>(entity: T, options?: RemoveOptions): Promise<T>;
 	/**
 	 * Records the delete date of all given entities.
 	 */
-	softRemove<T extends DeepPartial<Entity>>(
+	_softRemove<T extends DeepPartial<Entity>>(
 		entities: T[],
 		options: SaveOptions & {
 			reload: false;
@@ -1096,14 +1208,14 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	/**
 	 * Records the delete date of all given entities.
 	 */
-	softRemove<T extends DeepPartial<Entity>>(
+	_softRemove<T extends DeepPartial<Entity>>(
 		entities: T[],
 		options?: SaveOptions,
 	): Promise<(T & Entity)[]>;
 	/**
 	 * Records the delete date of a given entity.
 	 */
-	softRemove<T extends DeepPartial<Entity>>(
+	_softRemove<T extends DeepPartial<Entity>>(
 		entity: T,
 		options: SaveOptions & {
 			reload: false;
@@ -1112,14 +1224,14 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	/**
 	 * Records the delete date of a given entity.
 	 */
-	softRemove<T extends DeepPartial<Entity>>(
+	_softRemove<T extends DeepPartial<Entity>>(
 		entity: T,
 		options?: SaveOptions,
 	): Promise<T & Entity>;
 	/**
 	 * Recovers all given entities in the database.
 	 */
-	recover<T extends DeepPartial<Entity>>(
+	_recover<T extends DeepPartial<Entity>>(
 		entities: T[],
 		options: SaveOptions & {
 			reload: false;
@@ -1128,14 +1240,14 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	/**
 	 * Recovers all given entities in the database.
 	 */
-	recover<T extends DeepPartial<Entity>>(
+	_recover<T extends DeepPartial<Entity>>(
 		entities: T[],
 		options?: SaveOptions,
 	): Promise<(T & Entity)[]>;
 	/**
 	 * Recovers a given entity in the database.
 	 */
-	recover<T extends DeepPartial<Entity>>(
+	_recover<T extends DeepPartial<Entity>>(
 		entity: T,
 		options: SaveOptions & {
 			reload: false;
@@ -1144,11 +1256,11 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	/**
 	 * Recovers a given entity in the database.
 	 */
-	recover<T extends DeepPartial<Entity>>(entity: T, options?: SaveOptions): Promise<T & Entity>;
+	_recover<T extends DeepPartial<Entity>>(entity: T, options?: SaveOptions): Promise<T & Entity>;
 	/**
 	 * Reloads entity data from the database.
 	 */
-	reload(): Promise<void>;
+	_reload(): Promise<void>;
 	/**
 	 * Sets DataSource to be used by entity.
 	 */
@@ -1170,28 +1282,28 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	/**
 	 * Creates a new query builder that can be used to build a SQL query.
 	 */
-	createQueryBuilder<T extends Entity>(
+	_createQueryBuilder<T extends Entity>(
 		alias?: string,
 		queryRunner?: QueryRunner,
 	): SelectQueryBuilder<T>;
 	/**
 	 * Creates a new entity instance.
 	 */
-	create<T extends Entity>(this: { new (): T }): T;
+	_create<T extends Entity>(this: { new (): T }): T;
 	/**
 	 * Creates new entities and copies all entity properties from given objects into their new entities.
 	 * Note that it copies only properties that are present in entity schema.
 	 */
-	create<T extends Entity>(entityLikeArray: DeepPartial<T>[]): T[];
+	_create<T extends Entity>(entityLikeArray: DeepPartial<T>[]): T[];
 	/**
 	 * Creates a new entity instance and copies all entity properties from this object into a new entity.
 	 * Note that it copies only properties that are present in entity schema.
 	 */
-	create<T extends Entity>(entityLike: DeepPartial<T>): T;
+	_create<T extends Entity>(entityLike: DeepPartial<T>): T;
 	/**
 	 * Merges multiple entities (or entity-like objects) into a given entity.
 	 */
-	merge<T extends Entity>(mergeIntoEntity: T, ...entityLikes: DeepPartial<T>[]): T;
+	_merge<T extends Entity>(mergeIntoEntity: T, ...entityLikes: DeepPartial<T>[]): T;
 	/**
 	 * Creates a new entity from the given plain javascript object. If entity already exist in the database, then
 	 * it loads it (and everything related to it), replaces all values with the new ones from the given object
@@ -1201,14 +1313,14 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	 * Note that given entity-like object must have an entity id / primary key to find entity by.
 	 * Returns undefined if entity with given id was not found.
 	 */
-	preload<T extends Entity>(entityLike: DeepPartial<T>): Promise<T | undefined>;
+	_preload<T extends Entity>(entityLike: DeepPartial<T>): Promise<T | undefined>;
 	/**
 	 * Inserts a given entity into the database.
 	 * Unlike save method executes a primitive operation without cascades, relations and other operations included.
 	 * Executes fast and efficient INSERT query.
 	 * Does not check if entity exist in the database, so query will fail if duplicate entity is being inserted.
 	 */
-	insert<T extends Entity>(
+	_insert<T extends Entity>(
 		entity: QueryDeepPartialEntity<T> | QueryDeepPartialEntity<T>[],
 	): Promise<InsertResult>;
 	/**
@@ -1217,7 +1329,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	 * Executes fast and efficient UPDATE query.
 	 * Does not check if entity exist in the database.
 	 */
-	update<T extends Entity>(
+	_update<T extends Entity>(
 		criteria:
 			| string
 			| string[]
@@ -1235,7 +1347,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	 * Unlike save method executes a primitive operation without cascades, relations and other operations included.
 	 * Executes fast and efficient INSERT ... ON CONFLICT DO UPDATE/ON DUPLICATE KEY UPDATE query.
 	 */
-	upsert<T extends Entity>(
+	_upsert<T extends Entity>(
 		entityOrEntities: QueryDeepPartialEntity<T> | QueryDeepPartialEntity<T>[],
 		conflictPathsOrOptions: string[] | UpsertOptions<T>,
 	): Promise<InsertResult>;
@@ -1245,7 +1357,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	 * Executes fast and efficient DELETE query.
 	 * Does not check if entity exist in the database.
 	 */
-	delete<T extends Entity>(
+	_delete<T extends Entity>(
 		criteria:
 			| string
 			| string[]
@@ -1261,98 +1373,98 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	 * Counts entities that match given options.
 	 * Useful for pagination.
 	 */
-	count<T extends Entity>(options?: FindManyOptions<T>): Promise<number>;
+	_count<T extends Entity>(options?: FindManyOptions<T>): Promise<number>;
 	/**
 	 * Counts entities that match given conditions.
 	 * Useful for pagination.
 	 */
-	countBy<T extends Entity>(where: FindOptionsWhere<T> | FindOptionsWhere<T>[]): Promise<number>;
+	_countBy<T extends Entity>(where: FindOptionsWhere<T> | FindOptionsWhere<T>[]): Promise<number>;
 	/**
 	 * Return the SUM of a column
 	 */
-	sum<T extends Entity>(
+	_sum<T extends Entity>(
 		columnName: PickKeysByType<T, number>,
 		where?: FindOptionsWhere<T> | FindOptionsWhere<T>[],
 	): Promise<number | null>;
 	/**
 	 * Return the AVG of a column
 	 */
-	average<T extends Entity>(
+	_average<T extends Entity>(
 		columnName: PickKeysByType<T, number>,
 		where?: FindOptionsWhere<T> | FindOptionsWhere<T>[],
 	): Promise<number | null>;
 	/**
 	 * Return the MIN of a column
 	 */
-	minimum<T extends Entity>(
+	_minimum<T extends Entity>(
 		columnName: PickKeysByType<T, number>,
 		where?: FindOptionsWhere<T> | FindOptionsWhere<T>[],
 	): Promise<number | null>;
 	/**
 	 * Return the MAX of a column
 	 */
-	maximum<T extends Entity>(
+	_maximum<T extends Entity>(
 		columnName: PickKeysByType<T, number>,
 		where?: FindOptionsWhere<T> | FindOptionsWhere<T>[],
 	): Promise<number | null>;
 	/**
 	 * Finds entities that match given find options.
 	 */
-	find<T extends Entity>(options?: FindManyOptions<T>): Promise<T[]>;
+	_find<T extends Entity>(options?: FindManyOptions<T>): Promise<T[]>;
 	/**
 	 * Finds entities that match given find options.
 	 */
-	findBy<T extends Entity>(where: FindOptionsWhere<T> | FindOptionsWhere<T>[]): Promise<T[]>;
+	_findBy<T extends Entity>(where: FindOptionsWhere<T> | FindOptionsWhere<T>[]): Promise<T[]>;
 	/**
 	 * Finds entities that match given find options.
 	 * Also counts all entities that match given conditions,
 	 * but ignores pagination settings (from and take options).
 	 */
-	findAndCount<T extends Entity>(options?: FindManyOptions<T>): Promise<[T[], number]>;
+	_findAndCount<T extends Entity>(options?: FindManyOptions<T>): Promise<[T[], number]>;
 	/**
 	 * Finds entities that match given WHERE conditions.
 	 * Also counts all entities that match given conditions,
 	 * but ignores pagination settings (from and take options).
 	 */
-	findAndCountBy<T extends Entity>(
+	_findAndCountBy<T extends Entity>(
 		where: FindOptionsWhere<T> | FindOptionsWhere<T>[],
 	): Promise<[T[], number]>;
 	/**
 	 * Finds first entity by a given find options.
 	 * If entity was not found in the database - returns null.
 	 */
-	findOne<T extends Entity>(options: FindOneOptions<T>): Promise<T | null>;
+	_findOne<T extends Entity>(options: FindOneOptions<T>): Promise<T | null>;
 	/**
 	 * Finds first entity that matches given where condition.
 	 * If entity was not found in the database - returns null.
 	 */
-	findOneBy<T extends Entity>(
+	_findOneBy<T extends Entity>(
 		where: FindOptionsWhere<T> | FindOptionsWhere<T>[],
 	): Promise<T | null>;
 	/**
 	 * Finds first entity by a given find options.
 	 * If entity was not found in the database - rejects with error.
 	 */
-	findOneOrFail<T extends Entity>(options: FindOneOptions<T>): Promise<T>;
+	_findOneOrFail<T extends Entity>(options: FindOneOptions<T>): Promise<T>;
 	/**
 	 * Finds first entity that matches given where condition.
 	 * If entity was not found in the database - rejects with error.
 	 */
-	findOneByOrFail<T extends Entity>(
+	_findOneByOrFail<T extends Entity>(
 		where: FindOptionsWhere<T> | FindOptionsWhere<T>[],
 	): Promise<T>;
 	/**
 	 * Executes a raw SQL query and returns a raw database results.
 	 * Raw query execution is supported only by relational databases (MongoDB is not supported).
 	 */
-	query<T extends Entity>(query: string, parameters?: any[]): Promise<T>;
+	_query<T extends Entity>(query: string, parameters?: any[]): Promise<T>;
 	/**
 	 * Clears all the data from the given table/collection (truncates/drops it).
 	 *
 	 * Note: this method uses TRUNCATE and may not work as you expect in transactions on some platforms.
 	 * @see https://stackoverflow.com/a/5972738/925151
 	 */
-	clear<T extends Entity>(this: { new (): T }): Promise<void>;
+	_clear<T extends Entity>(this: { new (): T }): Promise<void>;
 	/**
 	 * MongoDB Only methods
 	 */
@@ -1360,18 +1472,18 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	 * MongoDB Only
 	 * Creates a cursor for a query that can be used to iterate over results from MongoDB.
 	 */
-	createCursor<T = any>(query?: Filter<Entity>): FindCursor<T>;
+	_createCursor<T = any>(query?: Filter<Entity>): FindCursor<T>;
 	/**
 	 * MongoDB Only
 	 * Creates a cursor for a query that can be used to iterate over results from MongoDB.
 	 * This returns modified version of cursor that transforms each result into Entity model.
 	 */
-	createEntityCursor(query?: Filter<Entity>): FindCursor<Entity>;
+	_createEntityCursor(query?: Filter<Entity>): FindCursor<Entity>;
 	/**
 	 * MongoDB Only
 	 * Execute an aggregation framework pipeline against the collection.
 	 */
-	aggregate<R = any>(
+	_aggregate<R = any>(
 		pipeline: ObjectLiteral[],
 		options?: AggregateOptions,
 	): AggregationCursor<Entity>;
@@ -1380,7 +1492,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	 * Execute an aggregation framework pipeline against the collection.
 	 * This returns modified version of cursor that transforms each result into Entity model.
 	 */
-	aggregateEntity(
+	_aggregateEntity(
 		pipeline: ObjectLiteral[],
 		options?: AggregateOptions,
 	): AggregationCursor<Entity>;
@@ -1388,7 +1500,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	 * MongoDB Only
 	 * Perform a bulkWrite operation without a fluent API.
 	 */
-	bulkWrite(
+	_bulkWrite(
 		operations: AnyBulkWriteOperation[],
 		options?: BulkWriteOptions,
 	): Promise<BulkWriteResult>;
@@ -1396,7 +1508,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	 * MongoDB Only
 	 * Creates an index on the db and collection.
 	 */
-	createCollectionIndex(
+	_createCollectionIndex(
 		fieldOrSpec: string | any,
 		options?: CreateIndexesOptions,
 	): Promise<string>;
@@ -1406,42 +1518,42 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	 * Earlier version of MongoDB will throw a command not supported error.
 	 * Index specifications are defined at http://docs.mongodb.org/manual/reference/command/createIndexes/.
 	 */
-	createCollectionIndexes(indexSpecs: IndexDescription[]): Promise<string[]>;
+	_createCollectionIndexes(indexSpecs: IndexDescription[]): Promise<string[]>;
 	/**
 	 * MongoDB Only
 	 * Delete multiple documents on MongoDB.
 	 */
-	deleteMany(query: ObjectLiteral, options?: DeleteOptions): Promise<DeleteResult>;
+	_deleteMany(query: ObjectLiteral, options?: DeleteOptions): Promise<DeleteResult>;
 	/**
 	 * MongoDB Only
 	 * Delete a document on MongoDB.
 	 */
-	deleteOne(query: ObjectLiteral, options?: DeleteOptions): Promise<DeleteResult>;
+	_deleteOne(query: ObjectLiteral, options?: DeleteOptions): Promise<DeleteResult>;
 	/**
 	 * MongoDB Only
 	 * The distinct command returns returns a list of distinct values for the given key across a collection.
 	 */
-	distinct(key: string, query: ObjectLiteral, options?: CommandOperationOptions): Promise<any>;
+	_distinct(key: string, query: ObjectLiteral, options?: CommandOperationOptions): Promise<any>;
 	/**
 	 * MongoDB Only
 	 * Drops an index from this collection.
 	 */
-	dropCollectionIndex(indexName: string, options?: CommandOperationOptions): Promise<any>;
+	_dropCollectionIndex(indexName: string, options?: CommandOperationOptions): Promise<any>;
 	/**
 	 * MongoDB Only
 	 * Drops all indexes from the collection.
 	 */
-	dropCollectionIndexes(): Promise<any>;
+	_dropCollectionIndexes(): Promise<any>;
 	/**
 	 * MongoDB Only
 	 * Find a document and delete it in one atomic operation, requires a write lock for the duration of the operation.
 	 */
-	findOneAndDelete(query: ObjectLiteral, options?: FindOneAndDeleteOptions): Promise<Document>;
+	_findOneAndDelete(query: ObjectLiteral, options?: FindOneAndDeleteOptions): Promise<Document>;
 	/**
 	 * MongoDB Only
 	 * Find a document and replace it in one atomic operation, requires a write lock for the duration of the operation.
 	 */
-	findOneAndReplace(
+	_findOneAndReplace(
 		query: ObjectLiteral,
 		replacement: Object,
 		options?: FindOneAndReplaceOptions,
@@ -1450,7 +1562,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	 * MongoDB Only
 	 * Find a document and update it in one atomic operation, requires a write lock for the duration of the operation.
 	 */
-	findOneAndUpdate(
+	_findOneAndUpdate(
 		query: ObjectLiteral,
 		update: Object,
 		options?: FindOneAndUpdateOptions,
@@ -1459,32 +1571,32 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	 * MongoDB Only
 	 * Retrieve all the indexes on the collection.
 	 */
-	collectionIndexes(): Promise<any>;
+	_collectionIndexes(): Promise<any>;
 	/**
 	 * MongoDB Only
 	 * Retrieve all the indexes on the collection.
 	 */
-	collectionIndexExists(indexes: string | string[]): Promise<boolean>;
+	_collectionIndexExists(indexes: string | string[]): Promise<boolean>;
 	/**
 	 * MongoDB Only
 	 * Retrieves this collections index info.
 	 */
-	collectionIndexInformation(options?: { full: boolean }): Promise<any>;
+	_collectionIndexInformation(options?: { full: boolean }): Promise<any>;
 	/**
 	 * MongoDB Only
 	 * Initiate an In order bulk write operation, operations will be serially executed in the order they are added, creating a new operation for each switch in types.
 	 */
-	initializeOrderedBulkOp(options?: BulkWriteOptions): OrderedBulkOperation;
+	_initializeOrderedBulkOp(options?: BulkWriteOptions): OrderedBulkOperation;
 	/**
 	 * MongoDB Only
 	 * Initiate a Out of order batch write operation. All operations will be buffered into insert/update/remove commands executed out of order.
 	 */
-	initializeUnorderedBulkOp(options?: BulkWriteOptions): UnorderedBulkOperation;
+	_initializeUnorderedBulkOp(options?: BulkWriteOptions): UnorderedBulkOperation;
 	/**
 	 * MongoDB Only
 	 * Inserts an array of documents into MongoDB.
 	 */
-	insertMany(
+	_insertMany(
 		docs: ObjectLiteral[],
 		options?: BulkWriteOptions,
 	): Promise<InsertManyResult<Document>>;
@@ -1492,27 +1604,27 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	 * MongoDB Only
 	 * Inserts a single document into MongoDB.
 	 */
-	insertOne(doc: ObjectLiteral, options?: InsertOneOptions): Promise<InsertOneResult>;
+	_insertOne(doc: ObjectLiteral, options?: InsertOneOptions): Promise<InsertOneResult>;
 	/**
 	 * MongoDB Only
 	 * Returns if the collection is a capped collection.
 	 */
-	isCapped(): Promise<any>;
+	_isCapped(): Promise<any>;
 	/**
 	 * MongoDB Only
 	 * Get the list of all indexes information for the collection.
 	 */
-	listCollectionIndexes(options?: ListIndexesOptions): ListIndexesCursor;
+	_listCollectionIndexes(options?: ListIndexesOptions): ListIndexesCursor;
 	/**
 	 * MongoDB Only
 	 * Reindex all indexes on the collection Warning: reIndex is a blocking operation (indexes are rebuilt in the foreground) and will be slow for large collections.
 	 */
-	rename(newName: string, options?: { dropTarget?: boolean }): Promise<Collection<Document>>;
+	_rename(newName: string, options?: { dropTarget?: boolean }): Promise<Collection<Document>>;
 	/**
 	 * MongoDB Only
 	 * Replace a document on MongoDB.
 	 */
-	replaceOne(
+	_replaceOne(
 		query: ObjectLiteral,
 		doc: ObjectLiteral,
 		options?: ReplaceOptions,
@@ -1521,12 +1633,12 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	 * MongoDB Only
 	 * Get all the collection statistics.
 	 */
-	stats(options?: CollStatsOptions): Promise<CollStats>;
+	_stats(options?: CollStatsOptions): Promise<CollStats>;
 	/**
 	 * MongoDB Only
 	 * Update multiple documents on MongoDB.
 	 */
-	updateMany(
+	_updateMany(
 		query: ObjectLiteral,
 		update: UpdateFilter<Document>,
 		options?: UpdateOptions,
@@ -1535,7 +1647,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	 * MongoDB Only
 	 * Update a single document on MongoDB.
 	 */
-	updateOne(
+	_updateOne(
 		query: ObjectLiteral,
 		update: UpdateFilter<Document>,
 		options?: UpdateOptions,
@@ -1584,44 +1696,140 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	 */
 	beforeQueryTransformID(idField: any): any;
 	/**
+	 * Count number of matching documents in the db to a query.
+	 *
+	 * @methods
+	 * @param {Object} options - count options
+	 * @param {Object?} query - query options
+	 * @returns {Promise<number>}
+	 * @memberof TypeORMDbAdapter
+	 */
+	count<T extends Entity>(
+		options?: FindManyOptions<T> | CountOptions,
+		query?: ObjectLiteral,
+	): Promise<number>;
+	/**
+	 * Finds entities that match given find options.
+	 *
+	 * @methods
+	 * @param {Context} ctx - request context
+	 * @param {Object} findManyOptions - find many options
+	 * @returns {Promise<[T | number]>}
+	 * @memberof TypeORMDbAdapter
+	 */
+	find<T extends Entity>(
+		ctx: Context,
+		findManyOptions?: FindManyOptions<T> | Partial<T> | FilterOperators<T>,
+	): Promise<[T[], number]>;
+	/**
+	 * Finds first item by a given find options.
+	 * If entity was not found in the database - returns null.
+	 * Available Options props:
+	 * - comment
+	 * - select
+	 * - where
+	 * - relations
+	 * - relationLoadStrategy
+	 * - join
+	 * - order
+	 * - cache
+	 * - lock
+	 * - withDeleted
+	 * - loadRelationIds
+	 * - loadEagerRelations
+	 * - transaction
+	 *
+	 * @methods
+	 * @param {Context} ctx - request context
+	 * @param {Object} findOptions - find options
+	 * @returns {Promise<T | undefined>}
+	 * @memberof TypeORMDbAdapter
+	 */
+	findOne<T extends Entity>(
+		ctx: Context,
+		findOptions?: FindOneOptions<T> | MongoFindOneOptions<T>,
+	): Promise<T | undefined>;
+	/**
 	 * Gets item by id. Can use find options
 	 *
 	 * @methods
-	 * @param {Partial<T>} key - primary column name
-	 * @param {string | number} id - id of entity
+	 * @param {Context} ctx - Request context
+	 * @param {Partial<T>} key - primary db id column name
+	 * @param {string | number | string[] | number[]} id - id(d) of entity
 	 * @param {Object} findOptions - find options, like relations, order, etc. No where clause
 	 * @returns {Promise<T | undefined>}
 	 *
 	 */
 	findByIdWO<T extends Entity>(
+		ctx: Context,
 		key: string | undefined | null,
-		id: string | number,
-		findOptions?: FindOneOptions<T>,
+		id: string | number | string[] | number[],
+		findOptions?: FindOneOptions<T> | FindManyOptions<T>,
 	): Promise<T | undefined>;
 
 	/**
 	 * Gets item by id. No find options
 	 *
 	 * @methods
-	 * @param {Partial<T>} key - primary column name
-	 * @param {string | number} id - id of entity
+	 * @param {Context} ctx - Request context
+	 * @param {Partial<T>} key - primary db id column name
+	 * @param {string | number | string[] | number[]} id - id(s) of entity
 	 * @returns {Promise<T | undefined>}
 	 *
 	 */
 	findById<T extends Entity>(
+		ctx: Context,
 		key: string | undefined | null,
-		id: string | number,
+		id: string | number | string[] | number[],
 	): Promise<T | undefined>;
+	/**
+	 * Populates entity(ies) by id(s) of another record.
+	 *
+	 * @methods
+	 *
+	 * @param {Context} ctx - Context instance.
+	 * @param {Object?} params - Parameters.
+	 *
+	 * @returns {Object|Array<Object>} Found entity(ies).
+	 *
+	 * @throws {EntityNotFoundError} - 404 Entity not found
+	 */
+	getPopulations(ctx: Context, params?: any): Object | Array<Object>;
 	/**
 	 * Gets items by id.
 	 *
 	 * @methods
-	 * @param {Partial<T>} key - primary column name
+	 * @param {Context} ctx - Request context
+	 * @param {Partial<T>} key - primary db id column name
 	 * @param {Array<string> | Array<number>} ids - ids of entity
 	 * @returns {Promise<T | undefined>}
+	 * @deprecated - use findById instead. It now supports multiple ids
 	 *
 	 */
-	findByIds<T extends Entity>(key: string | undefined | null, ids: any[]): Promise<T | undefined>;
+	findByIds<T extends Entity>(
+		ctx: Context,
+		key: string | undefined | null,
+		ids: any[],
+	): Promise<T | undefined>;
+	/**
+	 * Gets multiple items by id.
+	 * Can use find options, no where clause.
+	 * @methods
+	 * @param {Context} ctx - Request context
+	 * @param {Partial<T>} key - primary db id column name
+	 * @param {Array<string> | Array<number>} ids - ids of entity
+	 * @param {Object} findOptions - find options, like relations, order, etc. No where clause
+	 * @returns {Promise<T | undefined>}
+	 * @memberof TypeORMDbAdapter
+	 * @deprecated - use findByIdWO instead. It now supports multiple ids
+	 *
+	 */
+	findByIdsWO<T extends Entity>(
+		ctx: Context,
+		key: string | undefined | null,
+		ids: any[],
+		findOptions?: FindOneOptions<T>,
+	): Promise<T | undefined>;
 	/**
 	 * List entities by filters and pagination results.
 	 *
@@ -1660,6 +1868,24 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	 * @returns {any}
 	 */
 	decodeID(id: any): any;
+
+	/**
+	 * Convert id to mongodb ObjectId.
+	 * @methods
+	 * @param {any} id
+	 * @returns {any}
+	 * @memberof TypeORMDbAdapter
+	 */
+	toMongoObjectId(id: any): ObjectId;
+
+	/**
+	 * Convert mongodb ObjectId to string.
+	 * @methods
+	 * @param {any} id
+	 * @returns {any}
+	 * @memberof TypeORMDbAdapter
+	 */
+	fromMongoObjectId(id: any): string;
 
 	/**
 	 * Transform the fetched documents
@@ -1763,12 +1989,25 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> implements D
 	 */
 	authorizeFields(askedFields: any[]): any[];
 	/**
-	 * Update an entity by ID
+	 * Sanitize context parameters at `find` action.
 	 *
+	 * @methods
+	 *
+	 * @param {Context} ctx - Request context
+	 * @param {Object} params - Request parameters
+	 * @returns {Object} - Sanitized parameters
+	 * @memberof TypeORMDbAdapter
+	 */
+	sanitizeParams(ctx: any, params: any): any;
+	/**
+	 * Update an entity by ID
+	 * @param {Context} ctx - Request context
 	 * @param {any} id
 	 * @param {Object} update
 	 * @returns {Promise}
 	 * @memberof MemoryDbAdapter
 	 */
-	updateById(id: any, update: any): Promise<any>;
+	updateById(ctx: Context, id: any, update: any): Promise<any>;
 }
+
+export function TAdapterServiceSchemaMixin(mixinOptions?: any): ServiceSchema;
