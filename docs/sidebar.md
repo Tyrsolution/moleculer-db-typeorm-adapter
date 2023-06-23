@@ -4,6 +4,7 @@
 - [Configuration](configuration)
 - [Basic Usage](usage)
 - [Relations and Populations](relations.md)
+- [Auto Alias Schema](autoalias.md)
 - [API](api)
 - **Links**
 - [![Github](assets/img/github.svg)Github](https://github.com/tyrsolution/moleculer-db-typeorm-adapter)

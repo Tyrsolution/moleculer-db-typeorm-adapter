@@ -341,8 +341,6 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 						count: this.count,
 						find: this.find,
 						findOne: this.findOne,
-						findByIds: this.findByIds,
-						findByIdsWO: this.findByIdsWO,
 						list: this.list,
 						encodeID: this.encodeID,
 						decodeID: this.decodeID,
@@ -380,7 +378,6 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 		this.repository = db.manager.getRepository(
 			isArray(this._entity) ? this._entity[0] : this._entity!,
 		);
-		// this.repository = db.getRepository(entityArrray[0]);
 
 		/**
 		 * set datasource on this.adapter
@@ -430,7 +427,7 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 * @methods
 	 * @param {Object | Array<Object>} entityOrEntities - record(s) to create
 	 * @param {Object?} options - Optional MongoDB insert options
-	 * @returns {Promise<Object | Array<Object>}
+	 * @returns {Promise<Object | Array<Object>>}
 	 * @memberof TypeORMDbAdapter
 	 */
 	async create<T extends Entity>(
@@ -664,14 +661,14 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	 * @methods
 	 * @param {Context} ctx - request context
 	 * @param {Object} findManyOptions - find many options
-	 * @returns {Promise<[T | number]>}
+	 * @returns {Promise<T[] | number[]>}
 	 * @memberof TypeORMDbAdapter
 	 */
 	async find<T extends Entity>(
 		ctx: Context<FindManyOptions<T> | Partial<T> | FilterOperators<T>>,
 	): Promise<[T[], number]> {
 		const params = this.sanitizeParams(ctx, ctx.params);
-		const entity = await this['_find'](params)
+		return await this['_find'](params)
 			.then((docs: any) => {
 				this.broker.logger.debug('Transforming find docs...');
 				return this.transformDocuments(ctx, params, docs);
@@ -685,7 +682,6 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 					error,
 				);
 			});
-		return this.afterRetrieveTransformID(entity, this.service.settings.idField) as any;
 	}
 
 	/**
@@ -855,79 +851,77 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	): Promise<T | undefined> {
 		const transformId = this.beforeQueryTransformID(key);
 		const params = this.sanitizeParams(ctx, ctx.params);
-		const entity =
-			this.opts.type !== 'mongodb'
-				? isArray(id)
-					? await this['_findBy']({ [transformId]: In([...id]) })
-							.then((docs: any) => {
-								this.broker.logger.debug('Transforming findByIdWO docs...');
-								return this.transformDocuments(ctx, params, docs);
-							})
-							.catch((error: any) => {
-								this.broker.logger.error(`Failed to findById ${error}`);
-								new Errors.MoleculerServerError(
-									`Failed to findById ${error}`,
-									500,
-									'FAILED_TO_FIND_BY_ID',
-									error,
-								);
-							})
-					: await this['_findOneByOrFail']({ [transformId]: In([id]) })
-							.then((docs: any) => {
-								this.broker.logger.debug('Transforming findByIdWO docs...');
-								return this.transformDocuments(ctx, params, docs);
-							})
-							.catch((error: any) => {
-								this.broker.logger.error(`Failed to findById ${error}`);
-								new Errors.MoleculerServerError(
-									`Failed to findById ${error}`,
-									500,
-									'FAILED_TO_FIND_BY_ID',
-									error,
-								);
-							})
-				: isArray(id)
-				? await this['_find']({
-						where: {
-							[transformId]: {
-								$in: [
-									...map(id, (recordId: any) => this.toMongoObjectId(recordId)),
-								],
-							},
+		// const entity =
+		return this.opts.type !== 'mongodb'
+			? isArray(id)
+				? await this['_findBy']({ [transformId]: In([...id]) })
+						.then((docs: any) => {
+							this.broker.logger.debug('Transforming findByIdWO docs...');
+							return this.transformDocuments(ctx, params, docs);
+						})
+						.catch((error: any) => {
+							this.broker.logger.error(`Failed to findById ${error}`);
+							new Errors.MoleculerServerError(
+								`Failed to findById ${error}`,
+								500,
+								'FAILED_TO_FIND_BY_ID',
+								error,
+							);
+						})
+				: await this['_findOneByOrFail']({ [transformId]: In([id]) })
+						.then((docs: any) => {
+							this.broker.logger.debug('Transforming findByIdWO docs...');
+							return this.transformDocuments(ctx, params, docs);
+						})
+						.catch((error: any) => {
+							this.broker.logger.error(`Failed to findById ${error}`);
+							new Errors.MoleculerServerError(
+								`Failed to findById ${error}`,
+								500,
+								'FAILED_TO_FIND_BY_ID',
+								error,
+							);
+						})
+			: isArray(id)
+			? await this['_find']({
+					where: {
+						[transformId]: {
+							$in: [...map(id, (recordId: any) => this.toMongoObjectId(recordId))],
 						},
-				  })
-						.then((docs: any) => {
-							this.broker.logger.debug('Transforming findByIdWO docs...');
-							return this.transformDocuments(ctx, params, docs);
-						})
-						.catch((error: any) => {
-							this.broker.logger.error(`Failed to findById ${error}`);
-							new Errors.MoleculerServerError(
-								`Failed to findById ${error}`,
-								500,
-								'FAILED_TO_FIND_BY_ID',
-								error,
-							);
-						})
-				: await this['_findOneByOrFail']({
-						where: { [transformId]: { $in: [this.toMongoObjectId(id)] } },
-				  })
-						.then((docs: any) => {
-							this.broker.logger.debug('Transforming findByIdWO docs...');
-							return this.transformDocuments(ctx, params, docs);
-						})
-						.catch((error: any) => {
-							this.broker.logger.error(`Failed to findById ${error}`);
-							new Errors.MoleculerServerError(
-								`Failed to findById ${error}`,
-								500,
-								'FAILED_TO_FIND_BY_ID',
-								error,
-							);
-						}); // needed for mongodb
-		return this.afterRetrieveTransformID(entity, this.service.settings.idField) as
-			| T
-			| undefined;
+					},
+			  })
+					.then((docs: any) => {
+						this.broker.logger.debug('Transforming findByIdWO docs...');
+						return this.transformDocuments(ctx, params, docs);
+					})
+					.catch((error: any) => {
+						this.broker.logger.error(`Failed to findById ${error}`);
+						new Errors.MoleculerServerError(
+							`Failed to findById ${error}`,
+							500,
+							'FAILED_TO_FIND_BY_ID',
+							error,
+						);
+					})
+			: await this['_findOneByOrFail']({
+					where: { [transformId]: { $in: [this.toMongoObjectId(id)] } },
+			  })
+					.then((docs: any) => {
+						this.broker.logger.debug('Transforming findByIdWO docs...');
+						return this.transformDocuments(ctx, params, docs);
+					})
+					.catch((error: any) => {
+						this.broker.logger.error(`Failed to findById ${error}`);
+						new Errors.MoleculerServerError(
+							`Failed to findById ${error}`,
+							500,
+							'FAILED_TO_FIND_BY_ID',
+							error,
+						);
+					}); // needed for mongodb
+		// return this.afterRetrieveTransformID(entity, this.service.settings.idField) as
+		// 	| T
+		// 	| undefined;
 	}
 
 	/**
@@ -994,132 +988,6 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 	}
 
 	/**
-	 * Gets multiple items by id.
-	 * No find options
-	 * @methods
-	 * @param {Context} ctx - request context
-	 * @param {Partial<T>} key - primary db id column name
-	 * @param {Array<string> | Array<number>} ids - ids of entity
-	 * @returns {Promise<T | undefined>}
-	 * @memberof TypeORMDbAdapter
-	 * @deprecated - use findById instead. It now supports multiple ids
-	 */
-	async findByIds<T extends Entity>(
-		ctx: Context,
-		key: string | undefined | null = this.service.settings.idField,
-		ids: any[],
-	): Promise<T | undefined> {
-		const transformId = this.beforeQueryTransformID(key);
-		const params = this.sanitizeParams(ctx, ctx.params);
-		const entity =
-			this.opts.type !== 'mongodb'
-				? await this['_findBy']({ [transformId]: In([...ids]) })
-						.then((docs: any) => {
-							this.broker.logger.debug('Transforming findByIds docs...');
-							return this.transformDocuments(ctx, params, docs);
-						})
-						.catch((error: any) => {
-							this.broker.logger.error(`Failed to findByIds ${error}`);
-							new Errors.MoleculerServerError(
-								`Failed to findByIds ${error}`,
-								500,
-								'FAILED_TO_FIND_BY_IDS',
-								error,
-							);
-						})
-				: await this['_find']({
-						where: {
-							[transformId]: {
-								$in: [
-									...map(ids, (recordId: any) => this.toMongoObjectId(recordId)),
-								],
-							},
-						},
-				  })
-						.then((docs: any) => {
-							this.broker.logger.debug('Transforming findByIds docs...');
-							return this.transformDocuments(ctx, params, docs);
-						})
-						.catch((error: any) => {
-							this.broker.logger.error(`Failed to findByIds ${error}`);
-							new Errors.MoleculerServerError(
-								`Failed to findByIds ${error}`,
-								500,
-								'FAILED_TO_FIND_BY_IDS',
-								error,
-							);
-						}); // needed for mongodb. FindBy is having issues: https://github.com/typeorm/typeorm/issues/8889
-		return this.afterRetrieveTransformID(entity, this.service.settings.idField) as
-			| T
-			| undefined;
-	}
-
-	/**
-	 * Gets multiple items by id.
-	 * Can use find options, no where clause.
-	 * @methods
-	 * @param {Context} ctx - request context
-	 * @param {Partial<T>} key - primary db id column name
-	 * @param {Array<string> | Array<number>} ids - ids of entity
-	 * @param {Object} findOptions - find options, like relations, order, etc. No where clause
-	 * @returns {Promise<T | undefined>}
-	 * @memberof TypeORMDbAdapter
-	 * @deprecated - use findByIdWO instead. It now supports multiple ids
-	 *
-	 */
-	async findByIdsWO<T extends Entity>(
-		ctx: Context,
-		key: string | undefined | null = this.service.settings.idField,
-		ids: any[],
-		findOptions?: FindManyOptions<T>,
-	): Promise<T | undefined> {
-		const transformId = this.beforeQueryTransformID(key);
-		const params = this.sanitizeParams(ctx, ctx.params);
-		const entity =
-			this.opts.type !== 'mongodb'
-				? await this['_find']({ where: { [transformId]: In([...ids]) }, ...findOptions })
-						.then((docs: any) => {
-							this.broker.logger.debug('Transforming findByIdsWO docs...');
-							return this.transformDocuments(ctx, params, docs);
-						})
-						.catch((error: any) => {
-							this.broker.logger.error(`Failed to findByIdsWO ${error}`);
-							new Errors.MoleculerServerError(
-								`Failed to findByIdsWO ${error}`,
-								500,
-								'FAILED_TO_FIND_BY_IDS_WO',
-								error,
-							);
-						})
-				: await this['_find']({
-						where: {
-							[transformId]: {
-								$in: [
-									...map(ids, (recordId: any) => this.toMongoObjectId(recordId)),
-								],
-							},
-							...findOptions,
-						},
-				  })
-						.then((docs: any) => {
-							this.broker.logger.debug('Transforming findByIdsWO docs...');
-							return this.transformDocuments(ctx, params, docs);
-						})
-						.catch((error: any) => {
-							this.broker.logger.error(`Failed to findByIdsWO ${error}`);
-							new Errors.MoleculerServerError(
-								`Failed to findByIdsWO ${error}`,
-								500,
-								'FAILED_TO_FIND_BY_IDS_WO',
-								error,
-							);
-						}); // needed for mongodb. FindBy is having issues: https://github.com/typeorm/typeorm/issues/8889
-		return this.afterRetrieveTransformID(entity, this.service.settings.idField) as
-			| T
-			| undefined;
-	}
-
-	/**
 	 * List entities from db using filters and pagination results.
 	 * @methods
 	 * @param {Context} ctx - Context instance.
@@ -1131,8 +999,10 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 		const sanatizedParams = this.sanitizeParams(ctx, params);
 		let countParams = Object.assign({}, sanatizedParams);
 		// Remove pagination params
-		if (countParams && countParams.limit) countParams.limit = undefined;
-		if (countParams && countParams.offset) countParams.offset = undefined;
+		// if (countParams && countParams.limit) countParams.limit = undefined;
+		if (countParams?.limit) countParams.limit = undefined;
+		// if (countParams && countParams.offset) countParams.offset = undefined;
+		if (countParams?.offset) countParams.offset = undefined;
 		if (params.limit == null) {
 			if (this.service.settings.limit > 0 && params.pageSize! > this.service.settings.limit)
 				params.limit = this.service.settings.limit;
@@ -2049,7 +1919,7 @@ export const TAdapterServiceSchemaMixin = (mixinOptions?: any) => {
 						// @ts-ignore
 						let params = this.adapter.sanitizeParams(ctx, ctx.params);
 						// @ts-ignore
-						return this.adapter.find(params);
+						return this._find(params);
 					},
 				},
 
@@ -2305,7 +2175,7 @@ export const TAdapterServiceSchemaMixin = (mixinOptions?: any) => {
 					},
 					handler(ctx: Context): any {
 						// @ts-ignore
-						return this.adapter.remove(ctx, null, ctx.params);
+						return this._remove(ctx, ctx.params);
 					},
 				},
 			},
@@ -2709,7 +2579,7 @@ export const TAdapterServiceSchemaMixin = (mixinOptions?: any) => {
 									: cloneDeep(doc);
 							else origDoc = doc;
 							// @ts-ignore
-							return this.adapter.transformDocuments(ctx, params, doc);
+							return doc;
 						})
 						.then((json: any) => {
 							if (params.mapping !== true) return json;
@@ -2815,26 +2685,32 @@ export const TAdapterServiceSchemaMixin = (mixinOptions?: any) => {
 				_remove(ctx: Context, params: any): any {
 					// @ts-ignore
 					const id = this.adapter.decodeID(params.id);
+					let entity: any;
 					return (
 						Promise.resolve()
+							.then(async () => {
+								entity = await this.getById(ctx, null, id, true);
+								return entity;
+							})
 							// @ts-ignore
-							.then(() => this.beforeEntityChange('remove', params, ctx))
+							.then((entity) => this.beforeEntityChange('remove', entity, ctx))
 							// @ts-ignore
 							.then(() => this.adapter.removeById(id))
 							.then((doc) => {
-								if (!doc)
+								if (doc.deletedCount === 0)
 									return Promise.reject(
 										new Errors.MoleculerClientError(
 											'Entity not found',
 											400,
 											'',
-											params.id,
+											id,
 										),
 									);
 								// @ts-ignore
-								return this.transformDocuments(ctx, {}, doc).then((json: any) =>
-									// @ts-ignore
-									this.entityChanged('removed', json, ctx).then(() => json),
+								return this.transformDocuments(ctx, params, entity).then(
+									(json: any) =>
+										// @ts-ignore
+										this.entityChanged('removed', json, ctx).then(() => json),
 								);
 							})
 					);

@@ -304,6 +304,118 @@ It will be called in `broker.stop()` and is used internally.
 
 
 
+## `create` 
+
+Create new record or records.
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `entityOrEntities` | `Object`, `Array.<Object>` | **required** | record(s) to create |
+| `options` | `Object` | - | Optional MongoDB insert options |
+
+### Results
+**Type:** `Promise.<(Object|Array.<Object>)>`
+
+
+
+
+## `insert` 
+
+Create many new entities.
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `ctx` | `Context` | **required** | Context instance. |
+| `params` | `Object` | - | Parameters. |
+
+### Results
+**Type:** `Object`, `Array.<Object>`
+
+Saved entity(ies).
+
+
+## `updateById` 
+
+Update an entity by ID
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `ctx` | `Context` | **required** | request context |
+| `id` | `any` | **required** | ID of record to be updated |
+| `update` | `Object` | **required** | Object with update data |
+
+### Results
+**Type:** `Promise`
+
+- Updated record
+
+
+## `count` 
+
+Count number of matching documents in the db to a query.
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `options` | `Object` | **required** | count options |
+| `query` | `Object` | - | query options |
+
+### Results
+**Type:** `Promise.<number>`
+
+
+
+
+## `find` 
+
+Finds entities that match given find options.
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `ctx` | `Context` | **required** | request context |
+| `findManyOptions` | `Object` | **required** | find many options |
+
+### Results
+**Type:** `Promise.<(Array.<T>|Array.<number>)>`
+
+
+
+
+## `findOne` 
+
+Finds first item by a given find options.
+If entity was not found in the database - returns null.
+Available Options props:
+- comment
+- select
+- where
+- relations
+- relationLoadStrategy
+- join
+- order
+- cache
+- lock
+- withDeleted
+- loadRelationIds
+- loadEagerRelations
+- transaction
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `ctx` | `Context` | **required** | request context |
+| `findOptions` | `Object` | **required** | find options |
+
+### Results
+**Type:** `Promise.<(T|undefined)>`
+
+
+
+
 ## `findByIdWO` 
 
 Gets item by id(s). Can use find options, no where clause.
@@ -353,60 +465,6 @@ Populates entity(ies) by id(s) of another record.
 **Type:** `Object`, `Array.<Object>`
 
 Found entity(ies).
-
-
-## `findByIds` ![Deprecated action](https://img.shields.io/badge/status-deprecated-orange.svg) 
-
-Gets multiple items by id.
-No find options
-
-### Parameters
-| Property | Type | Default | Description |
-| -------- | ---- | ------- | ----------- |
-| `ctx` | `Context` | **required** | request context |
-| `key` | `Partial.<T>` | **required** | primary db id column name |
-| `ids` | `Array.<string>`, `Array.<number>` | **required** | ids of entity |
-
-### Results
-**Type:** `Promise.<(T|undefined)>`
-
-
-
-
-## `findByIdsWO` ![Deprecated action](https://img.shields.io/badge/status-deprecated-orange.svg) 
-
-Gets multiple items by id.
-Can use find options, no where clause.
-
-### Parameters
-| Property | Type | Default | Description |
-| -------- | ---- | ------- | ----------- |
-| `ctx` | `Context` | **required** | request context |
-| `key` | `Partial.<T>` | **required** | primary db id column name |
-| `ids` | `Array.<string>`, `Array.<number>` | **required** | ids of entity |
-| `findOptions` | `Object` | **required** | find options, like relations, order, etc. No where clause |
-
-### Results
-**Type:** `Promise.<(T|undefined)>`
-
-
-
-
-## `updateById` 
-
-Update an entity by ID
-
-### Parameters
-| Property | Type | Default | Description |
-| -------- | ---- | ------- | ----------- |
-| `ctx` | `Context` | **required** | request context |
-| `id` | `any` | **required** | ID of record to be updated |
-| `update` | `Object` | **required** | Object with update data |
-
-### Results
-**Type:** `Promise`
-
-- Updated record
 
 
 ## `list` 
@@ -712,6 +770,274 @@ Sanitize context parameters at `find` action.
 **Type:** `Object`
 
 - Sanitized parameters
+
+
+## `sanitizeParams` 
+
+Sanitize context parameters at `find` action.
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `ctx` | `Context` | **required** | Request context |
+| `params` | `Object` | **required** | Request parameters |
+
+### Results
+**Type:** `Object`
+
+- Sanitized parameters
+
+
+## `getById` 
+
+Get entity(ies) by ID(s).
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `id` | `any`, `Array.<any>` | **required** | ID or IDs. |
+| `decoding` | `Boolean` | - | Need to decode IDs. |
+
+### Results
+**Type:** `Object`, `Array.<Object>`
+
+Found entity(ies).
+
+
+## `beforeEntityChange` 
+
+Call before entity lifecycle events
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `type` | `String` | **required** |  |
+| `entity` | `Object` | **required** |  |
+| `ctx` | `Context` | **required** |  |
+
+### Results
+**Type:** `Promise`
+
+
+
+
+## `entityChanged` 
+
+Clear the cache & call entity lifecycle events
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `type` | `String` | **required** |  |
+| `json` | `Object`, `Array.<Object>`, `Number` | **required** |  |
+| `ctx` | `Context` | **required** |  |
+
+### Results
+**Type:** `Promise`
+
+
+
+
+## `clearCache` 
+
+Clear cached entities
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+*No input parameters.*
+
+### Results
+**Type:** `Promise`
+
+
+
+
+## `transformDocuments` 
+
+Transform the fetched documents
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `ctx` | `Context` | **required** |  |
+| `params` | `Object` | **required** |  |
+| `docs` | `Array`, `Object` | **required** |  |
+
+### Results
+**Type:** `Array`, `Object`
+
+
+
+
+## `validateEntity` 
+
+Validate an entity by validator.
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `entity` | `Object` | **required** |  |
+
+### Results
+**Type:** `Promise`
+
+
+
+
+## `encodeID` 
+
+Encode ID of entity.
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `id` | `any` | **required** |  |
+
+### Results
+**Type:** `any`
+
+
+
+
+## `decodeID` 
+
+Decode ID of entity.
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `id` | `any` | **required** |  |
+
+### Results
+**Type:** `any`
+
+
+
+
+## `_find` 
+
+Find entities by query.
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `ctx` | `Context` | **required** | Context instance. |
+| `params` | `Object` | - | Parameters. |
+
+### Results
+**Type:** `Array.<Object>`
+
+List of found entities.
+
+
+## `_count` 
+
+Get count of entities by query.
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `ctx` | `Context` | **required** | Context instance. |
+| `params` | `Object` | - | Parameters. |
+
+### Results
+**Type:** `Number`
+
+Count of found entities.
+
+
+## `_list` 
+
+List entities by filters and pagination results.
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `ctx` | `Context` | **required** | Context instance. |
+| `params` | `Object` | - | Parameters. |
+
+### Results
+**Type:** `Object`
+
+List of found entities and count.
+
+
+## `_create` 
+
+Create a new entity.
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `ctx` | `Context` | **required** | Context instance. |
+| `params` | `Object` | - | Parameters. |
+
+### Results
+**Type:** `Object`
+
+Saved entity.
+
+
+## `_insert` 
+
+Create many new entities.
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `ctx` | `Context` | **required** | Context instance. |
+| `params` | `Object` | - | Parameters. |
+
+### Results
+**Type:** `Object`, `Array.<Object>`
+
+Saved entity(ies).
+
+
+## `_get` 
+
+Get entity by ID.
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `ctx` | `Context` | **required** | Context instance. |
+| `params` | `Object` | - | Parameters. |
+
+### Results
+**Type:** `Object`, `Array.<Object>`
+
+Found entity(ies).
+
+
+## `_update` 
+
+Update an entity by ID.
+> After update, clear the cache & call lifecycle events.
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `ctx` | `Context` | **required** | Context instance. |
+| `params` | `Object` | - | Parameters. |
+
+### Results
+**Type:** `Object`
+
+Updated entity.
+
+
+## `_remove` 
+
+Remove an entity by ID.
+
+### Parameters
+| Property | Type | Default | Description |
+| -------- | ---- | ------- | ----------- |
+| `ctx` | `Context` | **required** | Context instance. |
+| `params` | `Object` | - | Parameters. |
+
 
 
 <!-- AUTO-CONTENT-END:METHODS -->
