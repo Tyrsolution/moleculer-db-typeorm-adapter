@@ -1728,9 +1728,27 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 
 		if (typeof p.populate === 'string') p.populate = p.populate.split(/[,\s]+/);
 
-		if (typeof p.relations === 'string') p.relations = JSON.parse(p.relations);
+		if (p?.relations) {
+			if (typeof p.relations === 'string') p.relations = JSON.parse(p.relations);
+			if (typeof p.relations === 'object') {
+				for (const [key, value] of Object.entries(p.relations)) {
+					if (value === 'true' || value === 'false') {
+						p.relations[key] = JSON.parse(value);
+					}
+				}
+			}
+		}
 
-		if (typeof p.where === 'string') p.where = JSON.parse(p.where); // where array paramater is an object or query
+		if (p?.where) {
+			if (typeof p.where === 'string') p.where = JSON.parse(p.where);
+			if (typeof p.where === 'object') {
+				for (const [key, value] of Object.entries(p.where)) {
+					if (value === 'true' || value === 'false') {
+						p.where[key] = JSON.parse(value);
+					}
+				}
+			}
+		} // where array paramater is an object or query
 
 		if (typeof p.searchFields === 'string') p.searchFields = p.searchFields.split(/[,\s]+/);
 
@@ -2732,7 +2750,7 @@ export const TAdapterServiceSchemaMixin = (mixinOptions?: any) => {
 
 				// if (!this.schema.adapter) this.adapter = new MemoryAdapter();
 				// else this.adapter = this.schema.adapter;
-				else this.adapter = this.schema.adapter;
+				this.adapter = this.schema.adapter;
 
 				this.adapter.init(this.broker, this);
 
