@@ -53,7 +53,7 @@
 		"better-sqlite3": "^8.4.0",
 		"coveralls": "^3.1.1",
 		"dts-bundle-generator": "^8.0.1",
-		"esbuild": "^0.18.5",
+		"esbuild": "^0.18.7",
 		"eslint": "^8.43.0",
 		"eslint-config-prettier": "^8.8.0",
 		"eslint-plugin-node": "^11.1.0",
@@ -69,7 +69,7 @@
 		"kleur": "^4.1.5",
 		"moleculer-db": "^0.8.23",
 		"nodemon": "^2.0.22",
-		"np": "^8.0.4",
+		"np": "^7.7.0",
 		"npm-check": "^6.0.1",
 		"npm-run-all": "^4.1.5",
 		"prettier": "^2.8.8",
@@ -129,7 +129,7 @@
 		"moleculer": "^0.14.29",
 		"mongodb": "^5.6.0",
 		"reflect-metadata": "^0.1.13",
-		"typeorm": "^0.3.16"
+		"typeorm": "^0.3.17"
 	},
 	"publishConfig": {
 		"access": "public"
