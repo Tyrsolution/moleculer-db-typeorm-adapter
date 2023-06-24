@@ -17,7 +17,8 @@ export class TypeProduct2 extends BaseEntity {
 	active!: boolean;
 
 	static findByName2(productName: string) {
-		return this.createQueryBuilder('type_product')
+		// @ts-ignore
+		return this._createQueryBuilder('type_product')
 			.where('type_product.name = :productName', { productName })
 			.getMany();
 	}

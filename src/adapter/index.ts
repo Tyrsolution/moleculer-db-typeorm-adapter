@@ -51,7 +51,8 @@ import { ObjectId } from 'mongodb';
 import { MongoFindOneOptions } from 'typeorm/find-options/mongodb/MongoFindOneOptions';
 import { flatten } from 'flat';
 import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
-const pkg = require('../package.json');
+// import path from 'node:path';
+// const pkg = require(path.resolve(__dirname, '../../package.json'));
 // const type = require('typeof-items');
 
 /**
@@ -318,7 +319,14 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 						  method === 'getId'
 							? (this[method] = dbRepository[method])
 							: (this[`_${method}`] = dbRepository[method])
-						: (methodsToAdd[method] = dbRepository[method]);
+						: method === 'hasId' ||
+						  method === 'getRepository' ||
+						  method === 'target' ||
+						  method === 'metadata' ||
+						  method === 'useDataSource' ||
+						  method === 'getId'
+						? (methodsToAdd[method] = dbRepository[method])
+						: (methodsToAdd[`_${method}`] = dbRepository[method]);
 				}
 			});
 			/**
@@ -1787,7 +1795,7 @@ export const TAdapterServiceSchemaMixin = (mixinOptions?: any) => {
 			name: '',
 
 			// Service's metadata
-			metadata: {
+			/* metadata: {
 				$category: 'database',
 				$description: 'Official Data Access service',
 				$official: true,
@@ -1796,7 +1804,7 @@ export const TAdapterServiceSchemaMixin = (mixinOptions?: any) => {
 					version: pkg.version,
 					repo: pkg.repository ? pkg.repository.url : null,
 				},
-			},
+			}, */
 
 			// Store adapter (NeDB adapter is the default)
 			adapter: null,

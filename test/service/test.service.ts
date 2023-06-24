@@ -38,7 +38,7 @@ const validateRoleBase: ActionParams = {
 		entities: [TypeProduct, TypeProduct2],
 	}),
 
-	model: [TypeProduct, TypeProduct2],
+	// model: [TypeProduct, TypeProduct2],
 	/**
 	 * Service guard token
 	 */
@@ -116,7 +116,7 @@ export default class ProductService extends moleculer.Service {
 		},
 	})
 	async createProduct(ctx: Context<any>) {
-		await this.adapter.TypeProduct2.save({ ...ctx.params, name: 'testofotherentity' })
+		await this.adapter.TypeProduct2._save({ ...ctx.params, name: 'testofotherentity' })
 			.then(async (res: any) => {
 				this.logger.debug(`♻ Product ${ctx.params.name} created on entity2 successfully.`);
 				return res;
@@ -132,7 +132,7 @@ export default class ProductService extends moleculer.Service {
 		this.logger.debug(`♻ Creating product ${ctx.params.name}`);
 
 		const result = await this.adapter
-			.save(ctx.params)
+			._save(ctx.params)
 			.then(async (res: any) => {
 				this.logger.debug(`♻ Product ${ctx.params.name} created successfully.`);
 				return res;
@@ -161,7 +161,7 @@ export default class ProductService extends moleculer.Service {
 		const params = this.sanitizeParams(ctx, ctx.params);
 		this.logger.debug(`♻ Attempting to get product with id ${params.id}`);
 		const product = await this.adapter
-			.find(params)
+			._find(params)
 			.then((res: any) => {
 				this.logger.debug(`♻ Product with id ${params.id} found`);
 				return res;
@@ -188,7 +188,7 @@ export default class ProductService extends moleculer.Service {
 	})
 	async increaseQuantity(ctx: Context<any>) {
 		this.logger.debug('♻ Increasing product quantity to: ', ctx.params.value);
-		const doc = await this.adapter.update(ctx.params.id, {
+		const doc = await this.adapter._update(ctx.params.id, {
 			quantity: ctx.params.value,
 		});
 		// .then((res: Record<string, unknown>) => res.value);
@@ -209,7 +209,7 @@ export default class ProductService extends moleculer.Service {
 	})
 	async decreaseQuantity(ctx: Context<any>) {
 		this.logger.debug('♻ Decreasing product quantity to: ', ctx.params.value);
-		const doc = await this.adapter.updateById(ctx.params.id, {
+		const doc = await this.adapter._updateById(ctx.params.id, {
 			$inc: { quantity: -ctx.params.value },
 		});
 		const json = await this.transformDocuments(ctx, ctx.params, doc);
@@ -238,7 +238,7 @@ export default class ProductService extends moleculer.Service {
 		console.log('id', id);
 		this.logger.debug('♻ Attempting to delete product...');
 		return await this.adapter
-			.delete(id)
+			._delete(id)
 			.then(async (record: any) => {
 				this.logger.debug('♻ Product deleted successfully');
 				return { recordsDeleted: record };
