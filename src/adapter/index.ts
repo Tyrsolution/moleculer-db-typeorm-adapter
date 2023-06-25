@@ -207,6 +207,8 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 			 * getRepository function required for this to work
 			 */
 			const methodsToAdd: { [key: string]: any } = {
+				_entity: this._entity,
+				opts: this.opts,
 				manager: dbManager,
 				repository: dbRepository,
 				getRepository: function getRepository() {
@@ -340,18 +342,23 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 				: index !== 0
 				? (this[entityName] = {
 						...methodsToAdd,
-						create: this.create,
-						findByIdWO: this.findByIdWO,
-						findById: this.findById,
-						getPopulations: this.getPopulations,
+						insert: this.insert,
+						updateById: this.updateById,
+						removeById: this.removeById,
 						count: this.count,
 						find: this.find,
 						findOne: this.findOne,
+						findByIdWO: this.findByIdWO,
+						findById: this.findById,
+						getPopulations: this.getPopulations,
 						list: this.list,
+						beforeSaveTransformID: this.beforeSaveTransformID,
+						afterRetrieveTransformID: this.afterRetrieveTransformID,
 						encodeID: this.encodeID,
-						decodeID: this.decodeID,
 						toMongoObjectId: this.toMongoObjectId,
 						fromMongoObjectId: this.fromMongoObjectId,
+						beforeQueryTransformID: this.beforeQueryTransformID,
+						decodeID: this.decodeID,
 						transformDocuments: this.transformDocuments,
 						beforeEntityChange: this.beforeEntityChange,
 						entityChanged: this.entityChanged,
@@ -362,11 +369,8 @@ export default class TypeORMDbAdapter<Entity extends ObjectLiteral> {
 						populateDocs: this.populateDocs,
 						validateEntity: this.validateEntity,
 						entityToObject: this.entityToObject,
-						beforeSaveTransformID: this.beforeSaveTransformID,
-						beforeQueryTransformID: this.beforeQueryTransformID,
-						afterRetrieveTransformID: this.afterRetrieveTransformID,
 						authorizeFields: this.authorizeFields,
-						updateById: this.updateById,
+						sanitizeParams: this.sanitizeParams,
 						broker: this.broker,
 						service: this.service,
 				  })
