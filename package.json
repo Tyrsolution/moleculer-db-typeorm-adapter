@@ -129,7 +129,7 @@
 		"moleculer": "^0.14.29",
 		"mongodb": "^5.6.0",
 		"reflect-metadata": "^0.1.13",
-		"typeorm": "^0.3.17"
+		"typeorm": "^0.3.18"
 	},
 	"publishConfig": {
 		"access": "public"
